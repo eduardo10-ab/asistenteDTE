@@ -392,6 +392,13 @@ class _HomeScreenState extends State<HomeScreen> {
   double _downloadProgress = 0.0;
   bool _isDownloading = false;
 
+  // <<<--- INICIO: CAMBIO 3 (Cooldown) --- >>>
+  DateTime? _lastPdfDownloadTime;
+  final Duration _pdfCooldown = const Duration(
+    seconds: 5,
+  ); // 5 segundos de cooldown
+  // <<<--- FIN: CAMBIO 3 --- >>>
+
   Future<bool> _requestStoragePermissions() async {
     print('Solicitando permisos de almacenamiento...');
 
@@ -433,11 +440,17 @@ class _HomeScreenState extends State<HomeScreen> {
             content: const Text(
               'La aplicación necesita permiso para guardar archivos (JSON/PDF) en tu dispositivo. '
               'Si no permites el acceso, se guardará una copia en la carpeta interna de la app, '
-              'pero no estará en la carpeta Descargas. ¿Deseas abrir la configuración ahora?'
+              'pero no estará en la carpeta Descargas. ¿Deseas abrir la configuración ahora?',
             ),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('No')),
-              TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Abrir configuración')),
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('No'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Abrir configuración'),
+              ),
             ],
           ),
         );
@@ -447,7 +460,8 @@ class _HomeScreenState extends State<HomeScreen> {
           // Re-check
           try {
             if (await Permission.storage.status.isGranted) return true;
-            if (await Permission.manageExternalStorage.status.isGranted) return true;
+            if (await Permission.manageExternalStorage.status.isGranted)
+              return true;
           } catch (e) {
             print('Error re-check permisos después de configuración: $e');
           }
@@ -543,6 +557,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 await _handleJsonDataDownload(jsonContent, filename);
               }
               if (pdfUrl.isNotEmpty) {
+                // Se aplicará el Cooldown DENTRO de _launchPdfUrl
                 await _launchPdfUrl(pdfUrl);
                 setState(() => _estaCargando = false);
               }
@@ -587,9 +602,32 @@ class _HomeScreenState extends State<HomeScreen> {
           }
           // Caso 4: PDF enviado como blob/base64 desde el injector JS
           else if (data['action'] == 'pdfBlob') {
+            // <<<--- INICIO: CAMBIO 3 (Cooldown) --- >>>
+            final now = DateTime.now();
+            if (_lastPdfDownloadTime != null &&
+                now.difference(_lastPdfDownloadTime!) < _pdfCooldown) {
+              print('[pdfBlob] Cooldown: Ignorando descarga duplicada.');
+              return; // Ignorar esta solicitud
+            }
+            _lastPdfDownloadTime = now;
+            // <<<--- FIN: CAMBIO 3 --- >>>
+
             try {
               final String base64Data = data['base64'] ?? '';
-              final String filename = data['filename'] ?? 'dte_${DateTime.now().millisecondsSinceEpoch}.pdf';
+
+              // <<<--- INICIO: CAMBIO 1 (Nombre de archivo único) --- >>>
+              // Limpia el nombre base y añade timestamp para asegurar que sea único
+              final String originalFileName =
+                  data['filename']?.replaceAll(
+                    RegExp(r'[^a-zA-Z0-9_.-]'),
+                    '',
+                  ) ??
+                  'dte_blob.pdf';
+              final String timestamp = DateTime.now().millisecondsSinceEpoch
+                  .toString();
+              final String filename = '${timestamp}_$originalFileName';
+              // <<<--- FIN: CAMBIO 1 --- >>>
+
               if (base64Data.isEmpty) {
                 _showErrorSnackBar('PDF vacío o no válido.');
                 return;
@@ -598,12 +636,17 @@ class _HomeScreenState extends State<HomeScreen> {
               // Pedir permisos si es necesario
               final bool hasPerm = await _requestStoragePermissions();
               if (!hasPerm) {
-                _showErrorSnackBar('Permiso de almacenamiento necesario para guardar el PDF.');
+                _showErrorSnackBar(
+                  'Permiso de almacenamiento necesario para guardar el PDF.',
+                );
                 return;
               }
 
-              Directory downloadsDir = Directory('/storage/emulated/0/Download');
-              if (!await downloadsDir.exists()) await downloadsDir.create(recursive: true);
+              Directory downloadsDir = Directory(
+                '/storage/emulated/0/Download',
+              );
+              if (!await downloadsDir.exists())
+                await downloadsDir.create(recursive: true);
               final String savePath = '${downloadsDir.path}/$filename';
 
               final bytes = base64Decode(base64Data);
@@ -613,15 +656,20 @@ class _HomeScreenState extends State<HomeScreen> {
 
               // Solicitar escaneo nativo
               try {
-                const platform = MethodChannel('com.facturacion.sv.app_factura/files');
+                const platform = MethodChannel(
+                  'com.facturacion.sv.app_factura/files',
+                );
                 await platform.invokeMethod('scanFile', {'path': savePath});
               } catch (e) {
                 print('Error solicitando scanFile al nativo (pdfBlob): $e');
               }
 
-              // Esperar un momento antes de la notificación del PDF
-              await Future.delayed(const Duration(seconds: 2));
-              
+              // <<<--- INICIO: CAMBIO 2 (Notificación) --- >>>
+              // Mostrar notificación de éxito ANTES de intentar abrir
+              _showMessage('Archivo PDF guardado en Descargas: $filename');
+              // (Se elimina el Future.delayed de 2 segundos)
+              // <<<--- FIN: CAMBIO 2 --- >>>
+
               // Abrir con visor nativo
               try {
                 final res = await OpenFilex.open(savePath);
@@ -688,6 +736,7 @@ class _HomeScreenState extends State<HomeScreen> {
               url.endsWith('.xls') ||
               url.endsWith('.xlsx')) {
             print('Detectada descarga de archivo directo (fallback): $url');
+            // Se aplicará el Cooldown DENTRO de _handleFileDownload
             _handleFileDownload(url);
             return NavigationDecision.prevent;
           }
@@ -739,7 +788,9 @@ class _HomeScreenState extends State<HomeScreen> {
             ''';
 
             _controller?.runJavaScript(blobReadScript);
-            _showMessage('Procesando JSON...');
+            // La acción 'pdfBlob' resultante será capturada por el 'case'
+            // en onMessageReceived, donde se aplicará el Cooldown.
+            _showMessage('Procesando JSON/PDF...');
             return NavigationDecision.prevent;
           }
 
@@ -859,7 +910,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
             // Pedir al sistema que indexe/escanee el archivo para que aparezca en Descargas
             try {
-              const platform = MethodChannel('com.facturacion.sv.app_factura/files');
+              const platform = MethodChannel(
+                'com.facturacion.sv.app_factura/files',
+              );
               await platform.invokeMethod('scanFile', {'path': savePath});
             } catch (e) {
               print('Error solicitando scanFile al nativo: $e');
@@ -905,6 +958,16 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // Función para abrir PDF: intentamos descargar localmente y abrir con el visor nativo.
   Future<void> _launchPdfUrl(String pdfUrl) async {
+    // <<<--- INICIO: CAMBIO 3 (Cooldown) --- >>>
+    final now = DateTime.now();
+    if (_lastPdfDownloadTime != null &&
+        now.difference(_lastPdfDownloadTime!) < _pdfCooldown) {
+      print('[_launchPdfUrl] Cooldown: Ignorando descarga duplicada.');
+      return; // Ignorar esta solicitud
+    }
+    _lastPdfDownloadTime = now;
+    // <<<--- FIN: CAMBIO 3 --- >>>
+
     print("Intentando procesar PDF: $pdfUrl");
 
     // Normalizar la URL
@@ -929,22 +992,33 @@ class _HomeScreenState extends State<HomeScreen> {
         await downloadsDir.create(recursive: true);
       }
 
-      final String fileName = uri.pathSegments.isNotEmpty
-          ? uri.pathSegments.last.split('?').first
-          : 'document_${DateTime.now().millisecondsSinceEpoch}.pdf';
+      // <<<--- INICIO: CAMBIO 1 (Nombre de archivo único) --- >>>
+      final String originalFileName = uri.pathSegments.isNotEmpty
+          ? uri.pathSegments.last
+                .split('?')
+                .first
+                .replaceAll(RegExp(r'[^a-zA-Z0-9_.-]'), '')
+          : 'documento.pdf';
+      final String timestamp = DateTime.now().millisecondsSinceEpoch.toString();
+      final String fileName = '${timestamp}_$originalFileName';
+      // <<<--- FIN: CAMBIO 1 --- >>>
+
       final String savePath = '${downloadsDir.path}/$fileName';
 
       // Descargar usando Dio
       Dio dio = Dio();
-      await dio.download(cleanUrl, savePath,
-          onReceiveProgress: (rec, total) {
-        if (total != -1 && mounted) {
-          setState(() {
-            _downloadProgress = rec / total;
-            _isDownloading = true;
-          });
-        }
-      });
+      await dio.download(
+        cleanUrl,
+        savePath,
+        onReceiveProgress: (rec, total) {
+          if (total != -1 && mounted) {
+            setState(() {
+              _downloadProgress = rec / total;
+              _isDownloading = true;
+            });
+          }
+        },
+      );
 
       // Escanear archivo para que aparezca en gestor de archivos
       try {
@@ -954,12 +1028,18 @@ class _HomeScreenState extends State<HomeScreen> {
         print('Error solicitando scanFile al nativo (pdf): $e');
       }
 
+      // <<<--- INICIO: CAMBIO 2 (Notificación) --- >>>
+      _showMessage('Archivo PDF guardado en Descargas: $fileName');
+      // <<<--- FIN: CAMBIO 2 --- >>>
+
       // Abrir con el visor nativo
       final result = await OpenFilex.open(savePath);
       print('OpenFilex result: $result');
       if (result.type != ResultType.done) {
         // Si falla, intentamos abrir la URL externamente
-        throw Exception('OpenFilex no pudo abrir el archivo: ${result.message}');
+        throw Exception(
+          'OpenFilex no pudo abrir el archivo: ${result.message}',
+        );
       }
     } catch (e) {
       print('No fue posible descargar/abrir localmente el PDF: $e');
@@ -988,15 +1068,41 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // Función para manejar la descarga de archivos genéricos
   Future<void> _handleFileDownload(String url, {String? customFileName}) async {
+    // <<<--- INICIO: CAMBIO 3 (Cooldown) --- >>>
+    // Solo aplicar cooldown si es un PDF, de lo contrario permitir (ej. ZIP)
+    if (url.endsWith('.pdf') || (customFileName ?? '').endsWith('.pdf')) {
+      final now = DateTime.now();
+      if (_lastPdfDownloadTime != null &&
+          now.difference(_lastPdfDownloadTime!) < _pdfCooldown) {
+        print(
+          '[_handleFileDownload] Cooldown: Ignorando descarga duplicada de PDF.',
+        );
+        return; // Ignorar esta solicitud
+      }
+      _lastPdfDownloadTime = now;
+    }
+    // <<<--- FIN: CAMBIO 3 --- >>>
+
     if (_isDownloading) {
       _showErrorSnackBar("Ya hay una descarga en curso.");
       return;
     }
 
-    String fileName = customFileName ?? url.split('/').last.split('?').first;
-    if (fileName.isEmpty || !fileName.contains('.')) {
-      fileName = 'download_${DateTime.now().millisecondsSinceEpoch}.file';
+    // <<<--- INICIO: CAMBIO 1 (Nombre de archivo único) --- >>>
+    String originalFileName =
+        customFileName ??
+        url
+            .split('/')
+            .last
+            .split('?')
+            .first
+            .replaceAll(RegExp(r'[^a-zA-Z0-9_.-]'), '');
+    if (originalFileName.isEmpty || !originalFileName.contains('.')) {
+      originalFileName = 'download.file';
     }
+    final String timestamp = DateTime.now().millisecondsSinceEpoch.toString();
+    String fileName = '${timestamp}_$originalFileName';
+    // <<<--- FIN: CAMBIO 1 --- >>>
 
     setState(() {
       _isDownloading = true;
@@ -1041,10 +1147,17 @@ class _HomeScreenState extends State<HomeScreen> {
       } catch (e) {
         print('Error solicitando scanFile al nativo (download): $e');
       }
-      
+
+      // <<<--- INICIO: CAMBIO 2 (Notificación) --- >>>
       if (mounted) {
-        _showMessage('Archivo descargado: $fileName');
+        // La URL original contenía .pdf, así que usamos el mensaje solicitado
+        if (url.endsWith('.pdf')) {
+          _showMessage('Archivo PDF guardado en Descargas: $fileName');
+        } else {
+          _showMessage('Archivo descargado: $fileName');
+        }
       }
+      // <<<--- FIN: CAMBIO 2 --- >>>
     } catch (e) {
       print('Error en la descarga: $e');
       _showErrorSnackBar('Error al descargar el archivo: ${e.toString()}');

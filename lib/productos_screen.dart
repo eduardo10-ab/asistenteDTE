@@ -447,9 +447,10 @@ class _ProductoFormState extends State<_ProductoForm> {
                       decimal: true,
                     ),
                     inputFormatters: [
-                      FilteringTextInputFormatter.allow(
-                        RegExp(r'^\d+\.?\d{0,2}'),
-                      ),
+                      // <<<--- INICIO: CAMBIO --- >>>
+                      // Se cambió \d{0,2} (máximo 2 decimales) por \d* (infinitos decimales)
+                      FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d*')),
+                      // <<<--- FIN: CAMBIO --- >>>
                     ],
                     validator: (val) {
                       if (val == null || val.isEmpty) return 'Campo requerido';
