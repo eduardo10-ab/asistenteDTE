@@ -38,7 +38,7 @@
             android:value="2" />
 
     </application>
-    <queries>
+<queries>
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
@@ -51,5 +51,10 @@
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="http" />
         </intent>
-    </queries>
+        
+        <intent>
+          <action android:name="android.intent.action.VIEW" />
+          <data android:scheme="mailto" />
+        </intent>
+        </queries>
 </manifest>

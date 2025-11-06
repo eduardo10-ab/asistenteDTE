@@ -1,5 +1,6 @@
 // lib/correo_screen.dart
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart'; // <<<--- INICIO: NUEVA IMPORTACIÓN
 import 'models.dart';
 import 'storage_service.dart';
 import 'main.dart'; // Para los colores
@@ -62,14 +63,58 @@ class CorreoScreenState extends State<CorreoScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error al cargar clientes: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      _showError('Error al cargar clientes: ${e.toString()}');
     }
   }
+
+  // <<<--- INICIO: NUEVA FUNCIÓN PARA ABRIR CORREO --- >>>
+  Future<void> _launchEmailApp(Cliente cliente) async {
+    if (cliente.email.isEmpty) {
+      _showError('Este cliente no tiene un correo electrónico registrado.');
+      return;
+    }
+
+    // 1. Definir Asunto y Cuerpo
+    const String subject = "Documento Tributario Electrónico";
+    final String body =
+        """
+Estimado cliente, ${cliente.nombreCliente}
+Muchas gracias por su compra.
+
+A continuación le adjunto su factura electrónica.
+
+Saludos.
+""";
+
+    // 2. Crear el URI de mailto
+    // Usamos Uri.encodeComponent para asegurar que los espacios y saltos de línea
+    // se conviertan a un formato válido para URL.
+    final Uri mailtoUri = Uri(
+      scheme: 'mailto',
+      path: cliente.email,
+      query:
+          'subject=${Uri.encodeComponent(subject)}&body=${Uri.encodeComponent(body)}',
+    );
+
+    // 3. Lanzar la URL
+    try {
+      if (await canLaunchUrl(mailtoUri)) {
+        await launchUrl(mailtoUri);
+      } else {
+        throw Exception('No se pudo abrir la app de correo.');
+      }
+    } catch (e) {
+      _showError('Error al abrir la app de correo: ${e.toString()}');
+    }
+  }
+
+  void _showError(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: Colors.red),
+    );
+  }
+  // <<<--- FIN: NUEVA FUNCIÓN PARA ABRIR CORREO --- >>>
 
   @override
   Widget build(BuildContext context) {
@@ -170,13 +215,12 @@ class CorreoScreenState extends State<CorreoScreen> {
       color: colorGrisClaro, // Color de fondo gris claro
       margin: const EdgeInsets.only(bottom: 8),
       child: InkWell(
+        // <<<--- INICIO: CAMBIO EN ONTAP --- >>>
         onTap: () {
-          // Acción al tocar el card (ej. enviar correo)
-          // Implementar si se desea
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Enviar correo a ${cliente.nombreCliente}')),
-          );
+          // Acción al tocar el card (lanzar app de correo)
+          _launchEmailApp(cliente);
         },
+        // <<<--- FIN: CAMBIO EN ONTAP --- >>>
         borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
