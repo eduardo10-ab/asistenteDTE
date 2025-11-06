@@ -18,7 +18,7 @@ import 'dart:convert'; // Para jsonDecode
 
 // --- Imports ---
 import 'clientes_perfiles_screen.dart';
-import 'productos_screen.dart';
+import 'productos_screen.dart'; // <<<--- IMPORTANTE: Importa la pantalla
 import 'configuracion_screen.dart';
 import 'menu_flotante_widget.dart';
 import 'models.dart';
@@ -197,6 +197,12 @@ class _MainScreenState extends State<MainScreen> {
   final GlobalKey<_HomeScreenState> _homeScreenKey =
       GlobalKey<_HomeScreenState>();
 
+  // <<<--- INICIO: NUEVA GLOBAL KEY --- >>>
+  // Clave para acceder al estado de ProductosScreen
+  final GlobalKey<ProductosScreenState> _productosScreenKey =
+      GlobalKey<ProductosScreenState>();
+  // <<<--- FIN: NUEVA GLOBAL KEY --- >>>
+
   @override
   void initState() {
     super.initState();
@@ -234,7 +240,13 @@ class _MainScreenState extends State<MainScreen> {
         ),
       ),
       ClientesPerfilesScreen(currentStatus: _activationStatus),
-      ProductosScreen(currentStatus: _activationStatus),
+
+      // <<<--- INICIO: ASIGNACIÓN DE KEY --- >>>
+      ProductosScreen(
+        key: _productosScreenKey, // Asigna la key aquí
+        currentStatus: _activationStatus,
+      ),
+      // <<<--- FIN: ASIGNACIÓN DE KEY --- >>>
     ];
   }
 
@@ -253,12 +265,23 @@ class _MainScreenState extends State<MainScreen> {
     }
   }
 
+  // <<<--- INICIO: LÓGICA DE RECARGA EN _onItemTapped --- >>>
   void _onItemTapped(int index) {
     if (!mounted) return;
+
+    // Si el usuario TOCA la pestaña de Productos (índice 3)
+    // Y NO estaba ya en esa pestaña...
+    if (index == 3 && _selectedIndex != 3) {
+      // Llama manualmente al método loadData() de ProductosScreen
+      // Esto fuerza la recarga con el perfil más reciente
+      _productosScreenKey.currentState?.loadData(_activationStatus);
+    }
+
     setState(() {
       _selectedIndex = index;
     });
   }
+  // <<<--- FIN: LÓGICA DE RECARGA EN _onItemTapped --- >>>
 
   Future<bool> _onWillPop() async {
     // 1. Revisa si la pantalla de "Inicio" (HomeScreen) está activa
@@ -363,6 +386,10 @@ class _MainScreenState extends State<MainScreen> {
   }
 } // Fin _MainScreenState
 
+//
+// El resto del archivo (HomeScreen, BlankPageWithNav, _mostrarMenuFlotante)
+// no necesita cambios.
+//
 //--- HomeScreen (AHORA CONTIENE EL WEBVIEW) ---
 class HomeScreen extends StatefulWidget {
   final ActivationStatus initialStatus;
@@ -392,12 +419,10 @@ class _HomeScreenState extends State<HomeScreen> {
   double _downloadProgress = 0.0;
   bool _isDownloading = false;
 
-  // <<<--- INICIO: CAMBIO 3 (Cooldown) --- >>>
   DateTime? _lastPdfDownloadTime;
   final Duration _pdfCooldown = const Duration(
     seconds: 5,
   ); // 5 segundos de cooldown
-  // <<<--- FIN: CAMBIO 3 --- >>>
 
   Future<bool> _requestStoragePermissions() async {
     print('Solicitando permisos de almacenamiento...');
@@ -518,15 +543,6 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // --- LÓGICA DE PERMISOS Y DESCARGA ---
-
-  // <<< --- CAMBIO 1 (ELIMINADO): _requestStoragePermission --- >>>
-  // Ya no necesitamos esta función.
-  /*
-  Future<bool> _requestStoragePermission() async {
-    ...
-  }
-  */
-
   Future<void> _setupWebView() async {
     _controller = WebViewController();
     await _controller!.addJavaScriptChannel(
@@ -602,7 +618,6 @@ class _HomeScreenState extends State<HomeScreen> {
           }
           // Caso 4: PDF enviado como blob/base64 desde el injector JS
           else if (data['action'] == 'pdfBlob') {
-            // <<<--- INICIO: CAMBIO 3 (Cooldown) --- >>>
             final now = DateTime.now();
             if (_lastPdfDownloadTime != null &&
                 now.difference(_lastPdfDownloadTime!) < _pdfCooldown) {
@@ -610,12 +625,10 @@ class _HomeScreenState extends State<HomeScreen> {
               return; // Ignorar esta solicitud
             }
             _lastPdfDownloadTime = now;
-            // <<<--- FIN: CAMBIO 3 --- >>>
 
             try {
               final String base64Data = data['base64'] ?? '';
 
-              // <<<--- INICIO: CAMBIO 1 (Nombre de archivo único) --- >>>
               // Limpia el nombre base y añade timestamp para asegurar que sea único
               final String originalFileName =
                   data['filename']?.replaceAll(
@@ -626,7 +639,6 @@ class _HomeScreenState extends State<HomeScreen> {
               final String timestamp = DateTime.now().millisecondsSinceEpoch
                   .toString();
               final String filename = '${timestamp}_$originalFileName';
-              // <<<--- FIN: CAMBIO 1 --- >>>
 
               if (base64Data.isEmpty) {
                 _showErrorSnackBar('PDF vacío o no válido.');
@@ -664,11 +676,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 print('Error solicitando scanFile al nativo (pdfBlob): $e');
               }
 
-              // <<<--- INICIO: CAMBIO 2 (Notificación) --- >>>
               // Mostrar notificación de éxito ANTES de intentar abrir
               _showMessage('Archivo PDF guardado en Descargas: $filename');
-              // (Se elimina el Future.delayed de 2 segundos)
-              // <<<--- FIN: CAMBIO 2 --- >>>
 
               // Abrir con visor nativo
               try {
@@ -686,7 +695,6 @@ class _HomeScreenState extends State<HomeScreen> {
               _showErrorSnackBar('Error al procesar PDF recibido.');
             }
           }
-          // Se eliminó el caso de domDump ya que no se necesita en producción
         } catch (e) {
           print('Error procesando mensaje de JS: $e');
           _showErrorSnackBar('Error procesando datos de la página.');
@@ -694,13 +702,6 @@ class _HomeScreenState extends State<HomeScreen> {
       },
     );
     await _controller!.setJavaScriptMode(JavaScriptMode.unrestricted);
-    // Nota: la API actual de `webview_flutter` (v4.x) no define
-    // `setJavaScriptCanOpenWindowsAutomatically` en `WebViewController`.
-    // Por eso no se llama aquí. Mantenemos control de pop-ups y enlaces
-    // usando `NavigationDelegate` (onNavigationRequest) y `addJavaScriptChannel`.
-    // Si necesitas soporte multi-ventana o comportamiento nativo, hay que
-    // configurarlo en la implementación de la plataforma (Android/iOS)
-    // o usar APIs específicas de la plataforma.
 
     await _controller!.setNavigationDelegate(
       NavigationDelegate(
@@ -724,11 +725,7 @@ class _HomeScreenState extends State<HomeScreen> {
           final String url = request.url;
           print('NavReq: $url | Main frame: ${request.isMainFrame}');
 
-          // <<< --- CAMBIO 3: LÓGICA DE NAVEGACIÓN REORDENADA --- >>>
-
           // REGLA 1: Capturar descargas de archivos (PDF, etc.)
-          // Esta regla ahora está PRIMERO, para capturar descargas
-          // tanto en el frame principal como en los pop-ups.
           if (url.endsWith('.pdf') ||
               url.endsWith('.zip') ||
               url.endsWith('.doc') ||
@@ -736,7 +733,6 @@ class _HomeScreenState extends State<HomeScreen> {
               url.endsWith('.xls') ||
               url.endsWith('.xlsx')) {
             print('Detectada descarga de archivo directo (fallback): $url');
-            // Se aplicará el Cooldown DENTRO de _handleFileDownload
             _handleFileDownload(url);
             return NavigationDecision.prevent;
           }
@@ -788,25 +784,20 @@ class _HomeScreenState extends State<HomeScreen> {
             ''';
 
             _controller?.runJavaScript(blobReadScript);
-            // La acción 'pdfBlob' resultante será capturada por el 'case'
-            // en onMessageReceived, donde se aplicará el Cooldown.
             _showMessage('Procesando JSON/PDF...');
             return NavigationDecision.prevent;
           }
 
           // REGLA 3: (Lógica de about:blank y javascript:)
           if (url == 'about:blank' || url.startsWith('javascript:')) {
-            // Permitir 'about:blank' si NO es el frame principal (para pop-ups)
             if (url == 'about:blank' && !request.isMainFrame) {
               print('Permitiendo navegación de pop-up a: $url');
               return NavigationDecision.navigate;
             }
-            // Bloquear 'about:blank' en el frame principal
             if (url == 'about:blank' && request.isMainFrame) {
               print('Bloqueando navegación de frame principal a: $url');
               return NavigationDecision.prevent;
             }
-            // Permitir otros javascript
             if (url.startsWith('javascript:')) {
               print('Permitiendo navegación interna: $url');
               return NavigationDecision.navigate;
@@ -848,7 +839,6 @@ class _HomeScreenState extends State<HomeScreen> {
             'Navegación normal permitida (isMainFrame: ${request.isMainFrame}, host: $requestHost).',
           );
           return NavigationDecision.navigate;
-          // <<< --- FIN CAMBIO 3 --- >>>
         },
       ),
     );
@@ -873,8 +863,6 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
   }
-
-  // <<< --- CAMBIO 2: LÓGICA DE GUARDADO SIN PERMISOS --- >>>
 
   // Función para guardar el contenido del JSON
   Future<void> _handleJsonDataDownload(
@@ -958,7 +946,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // Función para abrir PDF: intentamos descargar localmente y abrir con el visor nativo.
   Future<void> _launchPdfUrl(String pdfUrl) async {
-    // <<<--- INICIO: CAMBIO 3 (Cooldown) --- >>>
     final now = DateTime.now();
     if (_lastPdfDownloadTime != null &&
         now.difference(_lastPdfDownloadTime!) < _pdfCooldown) {
@@ -966,7 +953,6 @@ class _HomeScreenState extends State<HomeScreen> {
       return; // Ignorar esta solicitud
     }
     _lastPdfDownloadTime = now;
-    // <<<--- FIN: CAMBIO 3 --- >>>
 
     print("Intentando procesar PDF: $pdfUrl");
 
@@ -992,7 +978,6 @@ class _HomeScreenState extends State<HomeScreen> {
         await downloadsDir.create(recursive: true);
       }
 
-      // <<<--- INICIO: CAMBIO 1 (Nombre de archivo único) --- >>>
       final String originalFileName = uri.pathSegments.isNotEmpty
           ? uri.pathSegments.last
                 .split('?')
@@ -1001,7 +986,6 @@ class _HomeScreenState extends State<HomeScreen> {
           : 'documento.pdf';
       final String timestamp = DateTime.now().millisecondsSinceEpoch.toString();
       final String fileName = '${timestamp}_$originalFileName';
-      // <<<--- FIN: CAMBIO 1 --- >>>
 
       final String savePath = '${downloadsDir.path}/$fileName';
 
@@ -1028,9 +1012,7 @@ class _HomeScreenState extends State<HomeScreen> {
         print('Error solicitando scanFile al nativo (pdf): $e');
       }
 
-      // <<<--- INICIO: CAMBIO 2 (Notificación) --- >>>
       _showMessage('Archivo PDF guardado en Descargas: $fileName');
-      // <<<--- FIN: CAMBIO 2 --- >>>
 
       // Abrir con el visor nativo
       final result = await OpenFilex.open(savePath);
@@ -1068,7 +1050,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // Función para manejar la descarga de archivos genéricos
   Future<void> _handleFileDownload(String url, {String? customFileName}) async {
-    // <<<--- INICIO: CAMBIO 3 (Cooldown) --- >>>
     // Solo aplicar cooldown si es un PDF, de lo contrario permitir (ej. ZIP)
     if (url.endsWith('.pdf') || (customFileName ?? '').endsWith('.pdf')) {
       final now = DateTime.now();
@@ -1081,14 +1062,12 @@ class _HomeScreenState extends State<HomeScreen> {
       }
       _lastPdfDownloadTime = now;
     }
-    // <<<--- FIN: CAMBIO 3 --- >>>
 
     if (_isDownloading) {
       _showErrorSnackBar("Ya hay una descarga en curso.");
       return;
     }
 
-    // <<<--- INICIO: CAMBIO 1 (Nombre de archivo único) --- >>>
     String originalFileName =
         customFileName ??
         url
@@ -1102,7 +1081,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
     final String timestamp = DateTime.now().millisecondsSinceEpoch.toString();
     String fileName = '${timestamp}_$originalFileName';
-    // <<<--- FIN: CAMBIO 1 --- >>>
 
     setState(() {
       _isDownloading = true;
@@ -1148,7 +1126,6 @@ class _HomeScreenState extends State<HomeScreen> {
         print('Error solicitando scanFile al nativo (download): $e');
       }
 
-      // <<<--- INICIO: CAMBIO 2 (Notificación) --- >>>
       if (mounted) {
         // La URL original contenía .pdf, así que usamos el mensaje solicitado
         if (url.endsWith('.pdf')) {
@@ -1157,7 +1134,6 @@ class _HomeScreenState extends State<HomeScreen> {
           _showMessage('Archivo descargado: $fileName');
         }
       }
-      // <<<--- FIN: CAMBIO 2 --- >>>
     } catch (e) {
       print('Error en la descarga: $e');
       _showErrorSnackBar('Error al descargar el archivo: ${e.toString()}');
@@ -1170,7 +1146,6 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     }
   }
-  // <<< --- FIN CAMBIO 2 --- >>>
 
   // --- Lógica de UI (sin cambios) ---
   void _showError(String message) {
@@ -1435,7 +1410,7 @@ class _HomeScreenState extends State<HomeScreen> {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(
-          'Hola, Joel',
+          'Hola, Bienvenido',
           style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
         ),
         Icon(Icons.account_circle, size: 48, color: Colors.grey),

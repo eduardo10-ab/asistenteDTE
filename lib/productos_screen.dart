@@ -19,44 +19,63 @@ const Color successColor = Color(0xFF28a745);
 class ProductosScreen extends StatefulWidget {
   // Recibe el estado actual
   final ActivationStatus currentStatus;
+  // <<<--- CAMBIO: Se añade 'key' para que MainScreen pueda encontrar este widget --- >>>
   const ProductosScreen({super.key, required this.currentStatus});
 
   @override
-  State<ProductosScreen> createState() => _ProductosScreenState();
+  // <<<--- CAMBIO: Se hace pública la clase State --- >>>
+  State<ProductosScreen> createState() => ProductosScreenState();
 }
 
-class _ProductosScreenState extends State<ProductosScreen> {
+// <<<--- CAMBIO: Se hace pública la clase State --- >>>
+class ProductosScreenState extends State<ProductosScreen> {
   final StorageService _storage = StorageService();
   List<Producto> _productos = [];
   bool _isLoading = true;
-  // Ya no necesitamos _activationStatus local
   Producto? _productoParaEditar;
+
+  // <<<--- INICIO: NUEVA VARIABLE --- >>>
+  String _currentProfileName = ""; // Para guardar el nombre del perfil
+  // <<<--- FIN: NUEVA VARIABLE --- >>>
 
   @override
   void initState() {
     super.initState();
-    _loadData(widget.currentStatus);
+    // <<<--- CAMBIO: Se llama al método público --- >>>
+    loadData(widget.currentStatus);
   }
 
   @override
   void didUpdateWidget(covariant ProductosScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
+    // Esta función ahora solo recarga si el estado de activación (PRO/DEMO) cambia.
+    // La recarga por cambio de perfil se maneja desde main.dart
     if (widget.currentStatus != oldWidget.currentStatus) {
-      _loadData(widget.currentStatus);
+      // <<<--- CAMBIO: Se llama al método público --- >>>
+      loadData(widget.currentStatus);
     }
   }
 
-  Future<void> _loadData(ActivationStatus status) async {
+  // <<<--- CAMBIO: Método renombrado de _loadData a loadData --- >>>
+  Future<void> loadData(ActivationStatus status) async {
+    if (!mounted) return; // Asegurarse que el widget esté montado
     setState(() => _isLoading = true);
     try {
+      // <<<--- INICIO: NUEVA LÓGICA --- >>>
+      // Carga el nombre del perfil Y los productos de ese perfil
+      final profileName = await _storage.getCurrentProfileName();
       final productos = await _storage.getProductos();
+      // <<<--- FIN: NUEVA LÓGICA --- >>>
+      if (!mounted) return;
       setState(() {
         _productos = productos;
+        _currentProfileName = profileName; // Guarda el nombre del perfil
         _isLoading = false;
         _productoParaEditar = null;
       });
     } catch (e) {
       _showError('Error al cargar productos: ${e.toString()}');
+      if (!mounted) return;
       setState(() {
         _isLoading = false;
       });
@@ -83,13 +102,16 @@ class _ProductosScreenState extends State<ProductosScreen> {
       _showMessage(
         producto.id.isEmpty ? 'Producto guardado.' : 'Producto actualizado.',
       );
-      _loadData(widget.currentStatus);
+      // <<<--- CAMBIO: Se llama al método público --- >>>
+      loadData(widget.currentStatus);
     } catch (e) {
       _showError(e.toString());
     } finally {
-      setState(() {
-        _productoParaEditar = null;
-      });
+      if (mounted) {
+        setState(() {
+          _productoParaEditar = null;
+        });
+      }
     }
   }
 
@@ -117,7 +139,8 @@ class _ProductosScreenState extends State<ProductosScreen> {
       try {
         await _storage.deleteProducto(id);
         _showMessage('Producto eliminado.');
-        _loadData(widget.currentStatus);
+        // <<<--- CAMBIO: Se llama al método público --- >>>
+        loadData(widget.currentStatus);
       } catch (e) {
         _showError(e.toString());
       }
@@ -135,7 +158,23 @@ class _ProductosScreenState extends State<ProductosScreen> {
     return Scaffold(
       backgroundColor: colorScheme.background,
       appBar: AppBar(
-        title: const Text('Gestionar Productos'),
+        // <<<--- INICIO: CAMBIO EN APPBAR --- >>>
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text('Gestionar Productos'),
+            if (_currentProfileName.isNotEmpty && !_isLoading)
+              Text(
+                _currentProfileName, // Muestra el nombre del perfil
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: colorTextoSecundario,
+                  fontSize: 13,
+                ),
+              ),
+          ],
+        ),
+        // <<<--- FIN: CAMBIO EN APPBAR --- >>>
         elevation: 0,
         backgroundColor: colorScheme.background,
       ),
@@ -269,7 +308,9 @@ class _ProductosScreenState extends State<ProductosScreen> {
             ),
     );
   }
-} // Fin _ProductosScreenState
+}
+// El resto del archivo (_ProductoForm) no necesita cambios
+// ... (resto del archivo _ProductoForm sin cambios) ...
 
 // --- CLASE _ProductoForm (AJUSTADA PARA EL TEMA CLARO Y BLOQUEO NONE) ---
 class _ProductoForm extends StatefulWidget {
@@ -447,10 +488,9 @@ class _ProductoFormState extends State<_ProductoForm> {
                       decimal: true,
                     ),
                     inputFormatters: [
-                      // <<<--- INICIO: CAMBIO --- >>>
-                      // Se cambió \d{0,2} (máximo 2 decimales) por \d* (infinitos decimales)
-                      FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d*')),
-                      // <<<--- FIN: CAMBIO --- >>>
+                      FilteringTextInputFormatter.allow(
+                        RegExp(r'^\d+\.?\d*'), // Permite decimales ilimitados
+                      ),
                     ],
                     validator: (val) {
                       if (val == null || val.isEmpty) return 'Campo requerido';
