@@ -13,7 +13,6 @@ import 'package:cross_file/cross_file.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:convert'; // Para jsonDecode
 
-// <<< --- CAMBIO 1 (CONT): YA NO NECESITAMOS 'device_info_plus' --- >>>
 // import 'package:device_info_plus/device_info_plus.dart';
 
 // --- Imports ---
@@ -28,7 +27,9 @@ import 'js_injection.dart';
 // --- Colores ---
 const Color colorBlanco = Colors.white;
 const Color colorCelestePastel = Color(0xFF80D8FF);
-const Color colorAzulActivo = Color(0xFF40C4FF);
+const Color colorAzulActivo = Color(
+  0xFF40C4FF,
+); // Este es un celeste más brillante
 const Color colorGrisClaro = Color(0xFFF5F5F5);
 const Color colorTextoPrincipal = Color(0xFF424242);
 const Color colorTextoSecundario = Color(0xFF9E9E9E);
@@ -47,7 +48,7 @@ class MyApp extends StatelessWidget {
       title: 'Facturación App',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        // ... (Tu ThemeData sin cambios) ...
+        // ...
         colorScheme: ColorScheme.fromSeed(
           seedColor: colorCelestePastel,
           primary: colorCelestePastel,
@@ -66,16 +67,19 @@ class MyApp extends StatelessWidget {
           foregroundColor: colorTextoPrincipal,
           elevation: 1,
           iconTheme: IconThemeData(color: colorTextoPrincipal),
+          // <<<--- INICIO: CAMBIO DE TAMAÑO DE FUENTE --- >>>
           titleTextStyle: TextStyle(
             color: colorTextoPrincipal,
-            fontSize: 20,
+            fontSize: 24, // Antes era 20
             fontWeight: FontWeight.bold,
           ),
+          // <<<--- FIN: CAMBIO DE TAMAÑO DE FUENTE --- >>>
         ),
         bottomAppBarTheme: const BottomAppBarThemeData(
           color: colorBlanco,
           elevation: 2,
         ),
+        // ... (resto del tema sin cambios) ...
         floatingActionButtonTheme: const FloatingActionButtonThemeData(
           backgroundColor: colorAzulActivo,
           foregroundColor: colorBlanco,
@@ -178,7 +182,7 @@ class MyApp extends StatelessWidget {
   }
 }
 
-// --- MainScreen ---
+// --- MainScreen (Sin cambios) ---
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
   @override
@@ -193,11 +197,8 @@ class _MainScreenState extends State<MainScreen> {
   ActivationStatus _activationStatus = ActivationStatus.none;
   bool _isLoadingStatus = true;
 
-  // Clave para acceder al estado de HomeScreen
   final GlobalKey<_HomeScreenState> _homeScreenKey =
       GlobalKey<_HomeScreenState>();
-
-  // Clave para acceder al estado de ProductosScreen
   final GlobalKey<ProductosScreenState> _productosScreenKey =
       GlobalKey<ProductosScreenState>();
 
@@ -220,7 +221,7 @@ class _MainScreenState extends State<MainScreen> {
   void _buildScreens() {
     _widgetOptions = <Widget>[
       HomeScreen(
-        key: _homeScreenKey, // Asignación de la clave
+        key: _homeScreenKey,
         initialStatus: _activationStatus,
         onWebViewRequested: (controller) {
           if (mounted) {
@@ -238,9 +239,8 @@ class _MainScreenState extends State<MainScreen> {
         ),
       ),
       ClientesPerfilesScreen(currentStatus: _activationStatus),
-
       ProductosScreen(
-        key: _productosScreenKey, // Asigna la key aquí
+        key: _productosScreenKey,
         currentStatus: _activationStatus,
       ),
     ];
@@ -263,46 +263,31 @@ class _MainScreenState extends State<MainScreen> {
 
   void _onItemTapped(int index) {
     if (!mounted) return;
-
-    // Si el usuario TOCA la pestaña de Productos (índice 3)
-    // Y NO estaba ya en esa pestaña...
     if (index == 3 && _selectedIndex != 3) {
-      // Llama manualmente al método loadData() de ProductosScreen
-      // Esto fuerza la recarga con el perfil más reciente
       _productosScreenKey.currentState?.loadData(_activationStatus);
     }
-
     setState(() {
       _selectedIndex = index;
     });
   }
 
   Future<bool> _onWillPop() async {
-    // 1. Revisa si la pantalla de "Inicio" (HomeScreen) está activa
     if (_selectedIndex == 0) {
-      // 2. Comprueba si la HomeScreen PUEDE manejar el pop
       final homeState = _homeScreenKey.currentState;
       if (homeState != null) {
-        // 3. Llama a la lógica de pop de HomeScreen PRIMERO
         final bool handledByHome = await homeState.handlePop();
-        // Si HomeScreen lo manejó (ej. retrocedió en la web o mostró un diálogo),
-        // entonces MainScreen NO debe hacer nada (retorna false).
         if (handledByHome) {
-          return false; // Pop manejado por HomeScreen
+          return false;
         }
       }
     }
-
-    // 4. Si estamos en otra pestaña (Clientes, etc.), cambia a Inicio
     if (_selectedIndex != 0) {
       setState(() {
         _selectedIndex = 0;
       });
-      return false; // Previene que la app se cierre
+      return false;
     }
-
-    // 5. Si estamos en Inicio Y el WebView NO lo manejó, permite salir.
-    return true; // Permite que el PopScope llame a SystemNavigator.pop()
+    return true;
   }
 
   @override
@@ -316,7 +301,6 @@ class _MainScreenState extends State<MainScreen> {
         if (didPop) return;
         final bool shouldPop = await _onWillPop();
         if (shouldPop && mounted) {
-          // Cierra la app
           SystemNavigator.pop();
         }
       },
@@ -330,7 +314,7 @@ class _MainScreenState extends State<MainScreen> {
               _reloadActivationStatus,
             );
           },
-          child: const Icon(Icons.edit),
+          child: const Icon(Icons.mode_edit, color: colorBlanco),
         ),
         floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
         bottomNavigationBar: BottomAppBar(
@@ -511,7 +495,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // <<<--- INICIO: NUEVA FUNCIÓN AUXILIAR --- >>>
   /// Parsea el JSON para encontrar el 'codigoGeneracion' y usarlo como nombre de archivo.
   String _getFilenameFromJson(String jsonContent, String fallbackName) {
     try {
@@ -534,23 +517,18 @@ class _HomeScreenState extends State<HomeScreen> {
       }
 
       // Intento 3: Usar el fallback si es un nombre de archivo DTE válido (UUID)
-      // Quita la extensión .json si la tiene
       String cleanFallback = fallbackName.replaceAll('.json', '');
-      // Comprueba si parece un UUID de DTE
       if (cleanFallback.length == 36 && cleanFallback.contains('-')) {
         return '$cleanFallback.json';
       }
     } catch (e) {
       print('Error al parsear JSON para buscar nombre de archivo: $e');
     }
-
-    // Si todo falla, usa el fallback (asegurándose de que termine en .json)
     if (fallbackName.endsWith('.json')) {
       return fallbackName;
     }
     return '$fallbackName.json';
   }
-  // <<<--- FIN: NUEVA FUNCIÓN AUXILIAR --- >>>
 
   Future<void> _setupWebView() async {
     _controller = WebViewController();
@@ -577,16 +555,12 @@ class _HomeScreenState extends State<HomeScreen> {
               final String pdfUrl = jsonData['pdfUrl'] ?? '';
 
               if (jsonContent.isNotEmpty) {
-                // <<< INICIO: CAMBIO --- Nueva Lógica de Nombre --- >>>
-                // Usa el nombre del sitio si existe, si no, uno genérico
                 final String fallbackName = jsonData['filename'] ?? 'dte.json';
-                // Extrae el nombre real del contenido del JSON
                 final String finalFilename = _getFilenameFromJson(
                   jsonContent,
                   fallbackName,
                 );
                 await _handleJsonDataDownload(jsonContent, finalFilename);
-                // <<< FIN: CAMBIO --- Nueva Lógica de Nombre --- >>>
               }
               if (pdfUrl.isNotEmpty) {
                 await _launchPdfUrl(pdfUrl);
@@ -600,16 +574,13 @@ class _HomeScreenState extends State<HomeScreen> {
             final String jsonContent = data['jsonContent'] ?? '';
 
             if (jsonContent.isNotEmpty) {
-              // <<< INICIO: CAMBIO --- Nueva Lógica de Nombre --- >>>
               final String fallbackName =
                   data['filename'] ?? 'dte_from_blob.json';
-              // Extrae el nombre real del contenido del JSON
               final String finalFilename = _getFilenameFromJson(
                 jsonContent,
                 fallbackName,
               );
               _handleJsonDataDownload(jsonContent, finalFilename);
-              // <<< FIN: CAMBIO --- Nueva Lógica de Nombre --- >>>
             } else {
               _showErrorSnackBar('Error: El blob JSON estaba vacío.');
             }
@@ -898,7 +869,6 @@ class _HomeScreenState extends State<HomeScreen> {
           }
 
           if (downloadsDir != null) {
-            // <<< CAMBIO: 'filename' ya tiene la extensión .json
             final String savePath = '${downloadsDir.path}/$filename';
             final File file = File(savePath);
             await file.writeAsString(jsonContent, flush: true);
@@ -916,9 +886,7 @@ class _HomeScreenState extends State<HomeScreen> {
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text(
-                    'JSON guardado: $filename',
-                  ), // Muestra el nuevo nombre
+                  content: Text('JSON guardado: $filename'),
                   duration: const Duration(seconds: 2),
                 ),
               );
@@ -1140,7 +1108,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // --- Lógica de UI (sin cambios) ---
+  // --- Lógica de UI ---
   void _showError(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -1239,9 +1207,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: false,
-        title: Text(
-          _showWebView ? 'Portal de Facturación' : 'Facturación electrónica',
-        ),
+        title: Text(_showWebView ? 'Portal de Facturación' : 'Inicio'),
         actions: _showWebView
             ? [
                 IconButton(
@@ -1257,9 +1223,27 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ]
             : [
-                IconButton(
-                  icon: const Icon(Icons.notifications_none),
-                  onPressed: () {},
+                Padding(
+                  padding: const EdgeInsets.only(
+                    right: 8.0,
+                    top: 8.0,
+                    bottom: 8.0,
+                  ),
+                  child: Chip(
+                    label: Text(
+                      _activationStatus.name.toUpperCase(),
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: _getStatusChipTextColor(_activationStatus),
+                      ),
+                    ),
+                    backgroundColor: _getStatusChipColor(_activationStatus),
+                    side: BorderSide.none,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
+                  ),
                 ),
                 IconButton(
                   icon: const Icon(Icons.settings),
@@ -1292,7 +1276,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // --- Widgets Refactorizados (sin cambios) ---
+  // --- Widgets Refactorizados ---
 
   Widget _buildGreetingUI(
     BuildContext context,
@@ -1302,29 +1286,28 @@ class _HomeScreenState extends State<HomeScreen> {
     return ListView(
       padding: const EdgeInsets.all(16.0),
       children: [
+        // <<<--- INICIO: CAMBIO DE ESPACIADO --- >>>
+        const SizedBox(
+          height: 16.0,
+        ), // Espacio extra agregado en la parte superior
         _buildGreeting(),
-        const SizedBox(height: 12),
-        Center(
-          child: Chip(
-            label: Text(
-              'Estado: ${_activationStatus.name.toUpperCase()}',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: _getStatusChipTextColor(_activationStatus),
-              ),
-            ),
-            backgroundColor: _getStatusChipColor(_activationStatus),
-            side: BorderSide.none,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-          ),
-        ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 32),
+        // <<<--- FIN: CAMBIO DE ESPACIADO --- >>>
         _buildButtons(context),
-        const SizedBox(height: 24),
+
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 24.0),
+          child: Divider(color: Colors.grey[300], height: 1),
+        ),
+
         if (_activationStatus != ActivationStatus.pro) ...[
           _buildActivationSection(),
-          const SizedBox(height: 24),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 24.0),
+            child: Divider(color: Colors.grey[300], height: 1),
+          ),
         ],
+
         _buildOverlaySection(context, overlayEnabled ? _toggleWebView : null),
         const SizedBox(height: 24),
         if (_activationStatus != ActivationStatus.pro) _buildProSection(),
@@ -1390,39 +1373,57 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  // <<<--- INICIO: CAMBIO DE TAMAÑO DE FUENTE --- >>>
   Widget _buildGreeting() {
-    return const Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          'Hola, Joel',
-          style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
-        ),
-        Icon(Icons.account_circle, size: 48, color: Colors.grey),
-      ],
+    return const Text(
+      'Bienvenido a tu asistente de facturación DTE',
+      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold), // Antes 24
     );
   }
+  // <<<--- FIN: CAMBIO DE TAMAÑO DE FUENTE --- >>>
 
   Widget _buildButtons(BuildContext context) {
     return Row(
       children: [
         Expanded(
-          child: OutlinedButton(
+          child: ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: colorAzulActivo, // Color brillante
+              foregroundColor: colorBlanco,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 20),
+            ),
             onPressed: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (context) => const BlankPageWithNav()),
             ),
-            child: const Text('Manual'),
-          ),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: OutlinedButton(
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const BlankPageWithNav()),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Tutorial',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 16,
+                    color: colorBlanco,
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.all(6.0),
+                  decoration: BoxDecoration(
+                    color: colorBlanco,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Icon(
+                    Icons.double_arrow,
+                    color: colorAzulActivo, // Flechas color brillante
+                    size: 18,
+                  ),
+                ),
+              ],
             ),
-            child: const Text('Tutorial'),
           ),
         ),
       ],
@@ -1497,7 +1498,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Iniciar superposición', style: theme.textTheme.titleMedium),
+        Text('Iniciar Asistente DTE', style: theme.textTheme.titleMedium),
         const SizedBox(height: 12),
         Opacity(
           opacity: isEnabled ? 1.0 : 0.5,
