@@ -23,6 +23,7 @@ import 'menu_flotante_widget.dart';
 import 'models.dart';
 import 'storage_service.dart';
 import 'js_injection.dart';
+import 'correo_screen.dart'; // <<<--- INICIO: NUEVA IMPORTACIÓN --- >>>
 
 // --- Colores ---
 const Color colorBlanco = Colors.white;
@@ -39,7 +40,7 @@ void main() async {
   runApp(const MyApp());
 }
 
-// --- MyApp (Sin cambios) ---
+// --- MyApp ---
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
   @override
@@ -48,7 +49,6 @@ class MyApp extends StatelessWidget {
       title: 'Facturación App',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        // ...
         colorScheme: ColorScheme.fromSeed(
           seedColor: colorCelestePastel,
           primary: colorCelestePastel,
@@ -67,19 +67,16 @@ class MyApp extends StatelessWidget {
           foregroundColor: colorTextoPrincipal,
           elevation: 1,
           iconTheme: IconThemeData(color: colorTextoPrincipal),
-          // <<<--- INICIO: CAMBIO DE TAMAÑO DE FUENTE --- >>>
           titleTextStyle: TextStyle(
             color: colorTextoPrincipal,
-            fontSize: 24, // Antes era 20
+            fontSize: 24, // Tamaño de fuente del título de la AppBar
             fontWeight: FontWeight.bold,
           ),
-          // <<<--- FIN: CAMBIO DE TAMAÑO DE FUENTE --- >>>
         ),
         bottomAppBarTheme: const BottomAppBarThemeData(
           color: colorBlanco,
           elevation: 2,
         ),
-        // ... (resto del tema sin cambios) ...
         floatingActionButtonTheme: const FloatingActionButtonThemeData(
           backgroundColor: colorAzulActivo,
           foregroundColor: colorBlanco,
@@ -182,7 +179,7 @@ class MyApp extends StatelessWidget {
   }
 }
 
-// --- MainScreen (Sin cambios) ---
+// --- MainScreen ---
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
   @override
@@ -201,6 +198,10 @@ class _MainScreenState extends State<MainScreen> {
       GlobalKey<_HomeScreenState>();
   final GlobalKey<ProductosScreenState> _productosScreenKey =
       GlobalKey<ProductosScreenState>();
+  // <<<--- INICIO: NUEVA GLOBAL KEY --- >>>
+  final GlobalKey<CorreoScreenState> _correoScreenKey =
+      GlobalKey<CorreoScreenState>();
+  // <<<--- FIN: NUEVA GLOBAL KEY --- >>>
 
   @override
   void initState() {
@@ -232,12 +233,12 @@ class _MainScreenState extends State<MainScreen> {
         },
         onStatusChangeNeeded: _reloadActivationStatus,
       ),
-      const Center(
-        child: Text(
-          'Pantalla de Correo',
-          style: TextStyle(color: colorTextoPrincipal),
-        ),
+      // <<<--- INICIO: CAMBIO EN PANTALLA DE CORREO --- >>>
+      CorreoScreen(
+        key: _correoScreenKey, // Asigna la key
+        currentStatus: _activationStatus,
       ),
+      // <<<--- FIN: CAMBIO EN PANTALLA DE CORREO --- >>>
       ClientesPerfilesScreen(currentStatus: _activationStatus),
       ProductosScreen(
         key: _productosScreenKey,
@@ -263,9 +264,18 @@ class _MainScreenState extends State<MainScreen> {
 
   void _onItemTapped(int index) {
     if (!mounted) return;
+
+    // <<<--- INICIO: NUEVA LÓGICA DE RECARGA --- >>>
+    // Recarga Correo si se toca la pestaña 1
+    if (index == 1 && _selectedIndex != 1) {
+      _correoScreenKey.currentState?.loadData();
+    }
+    // Recarga Productos si se toca la pestaña 3
     if (index == 3 && _selectedIndex != 3) {
       _productosScreenKey.currentState?.loadData(_activationStatus);
     }
+    // <<<--- FIN: NUEVA LÓGICA DE RECARGA --- >>>
+
     setState(() {
       _selectedIndex = index;
     });
@@ -364,6 +374,10 @@ class _MainScreenState extends State<MainScreen> {
   }
 } // Fin _MainScreenState
 
+//
+// El resto del archivo (HomeScreen, BlankPageWithNav, etc.)
+// no necesita cambios.
+//
 //--- HomeScreen (AHORA CONTIENE EL WEBVIEW) ---
 class HomeScreen extends StatefulWidget {
   final ActivationStatus initialStatus;

@@ -25,17 +25,12 @@ class _MenuFlotanteWidgetState extends State<MenuFlotanteWidget> {
   List<Cliente> _clientes = [];
   List<Producto> _productos = [];
 
-  // <<<--- CAMBIO: Se elimina _productoSel --- >>>
-  // String? _productoSel; // Ya no es necesario
-
   bool _isLoading = true;
   bool get _puedeInyectar => widget.webViewController != null;
 
   // Controla las vistas del menú
   bool _mostrandoListaClientes = false;
-  // <<<--- INICIO: NUEVA VARIABLE DE ESTADO --- >>>
   bool _mostrandoListaProductos = false;
-  // <<<--- FIN: NUEVA VARIABLE DE ESTADO --- >>>
 
   @override
   void initState() {
@@ -53,12 +48,6 @@ class _MenuFlotanteWidgetState extends State<MenuFlotanteWidget> {
     setState(() {
       _clientes = clientes;
       _productos = productos;
-
-      // <<<--- CAMBIO: Se elimina la pre-selección de producto --- >>>
-      // if (productos.isNotEmpty) {
-      //   _productoSel = productos.first.id;
-      // }
-
       _isLoading = false;
     });
   }
@@ -66,25 +55,28 @@ class _MenuFlotanteWidgetState extends State<MenuFlotanteWidget> {
   // Inyecta el cliente seleccionado
   void _inyectarClienteEspecifico(Cliente cliente) {
     if (!_puedeInyectar) return;
+
+    // <<<--- INICIO: GUARDAR CLIENTE RECIENTE --- >>>
+    // Guarda el ID de este cliente como el "último facturado"
+    _storage.setLastInvoicedClientId(cliente.id);
+    // <<<--- FIN: GUARDAR CLIENTE RECIENTE --- >>>
+
     final clienteJson = jsonEncode(cliente.toJson());
     widget.webViewController!.runJavaScript(jsInjector);
     widget.webViewController!.runJavaScript('fillClientData($clienteJson);');
     Navigator.pop(context); // Cierra el modal
   }
 
-  // <<<--- INICIO: NUEVA FUNCIÓN DE INYECCIÓN --- >>>
-  // Esta función ahora acepta el producto específico a inyectar
+  // Inyecta el producto seleccionado
   void _inyectarProductoEspecifico(Producto producto) {
     if (!_puedeInyectar) return;
     final productoJson = jsonEncode(producto.toJson());
-    // Aseguramos que el JS esté inyectado (por si acaso)
     widget.webViewController!.runJavaScript(jsInjector);
     widget.webViewController!.runJavaScript(
       'addProductToInvoice($productoJson);',
     );
     Navigator.pop(context); // Cierra el modal
   }
-  // <<<--- FIN: NUEVA FUNCIÓN DE INYECCIÓN --- >>>
 
   @override
   Widget build(BuildContext context) {
@@ -123,17 +115,15 @@ class _MenuFlotanteWidgetState extends State<MenuFlotanteWidget> {
                       height: 100,
                       child: Center(child: CircularProgressIndicator()),
                     )
-                  // <<<--- INICIO: CAMBIO DE LÓGICA DE UI --- >>>
                   : AnimatedSwitcher(
                       duration: const Duration(milliseconds: 200),
                       // El child cambia basado en la variable de estado
                       child: _mostrandoListaClientes
                           ? _buildListaClientes()
-                          : _mostrandoListaProductos // <<< NUEVO
-                          ? _buildListaProductos() // <<< NUEVO
+                          : _mostrandoListaProductos
+                          ? _buildListaProductos()
                           : _buildMenuPrincipal(),
                     ),
-              // <<<--- FIN: CAMBIO DE LÓGICA DE UI --- >>>
             ),
           ),
           const SizedBox(height: 16),
@@ -153,7 +143,7 @@ class _MenuFlotanteWidgetState extends State<MenuFlotanteWidget> {
     );
   }
 
-  /// Muestra los botones de acción principales
+  /// Muestra los botones de acción principales (Sin cambios)
   Widget _buildMenuPrincipal() {
     return Column(
       key: const ValueKey('menu_principal'), // Key para el AnimatedSwitcher
@@ -171,26 +161,22 @@ class _MenuFlotanteWidgetState extends State<MenuFlotanteWidget> {
         ),
         Divider(height: 1, color: colorGrisClaro, indent: 16, endIndent: 16),
 
-        // <<<--- INICIO: CAMBIO DE LÓGICA ONPRESSED --- >>>
         _buildMenuButton(
           'Agregar Ítem',
           Icons.add_shopping_cart,
-          // Habilitado solo si hay productos para elegir
           (_puedeInyectar && _productos.isNotEmpty)
               ? () {
-                  // La acción ahora es MOSTRAR LA LISTA DE PRODUCTOS
                   setState(() {
                     _mostrandoListaProductos = true;
                   });
                 }
-              : null, // Deshabilitado si no hay productos
+              : null,
         ),
-        // <<<--- FIN: CAMBIO DE LÓGICA ONPRESSED --- >>>
       ],
     );
   }
 
-  /// Muestra un ListView de clientes seleccionables
+  /// Muestra un ListView de clientes seleccionables (Sin cambios)
   Widget _buildListaClientes() {
     return ConstrainedBox(
       key: const ValueKey('lista_clientes'), // Key para el AnimatedSwitcher
@@ -265,8 +251,7 @@ class _MenuFlotanteWidgetState extends State<MenuFlotanteWidget> {
     );
   }
 
-  // <<<--- INICIO: NUEVO WIDGET (Lista de Productos) --- >>>
-  /// Muestra un ListView de productos seleccionables
+  /// Muestra un ListView de productos seleccionables (Sin cambios)
   Widget _buildListaProductos() {
     return ConstrainedBox(
       key: const ValueKey('lista_productos'), // Key para el AnimatedSwitcher
@@ -279,7 +264,6 @@ class _MenuFlotanteWidgetState extends State<MenuFlotanteWidget> {
           // 1. Botón de Volver
           InkWell(
             onTap: () {
-              // Regresa al menú principal
               setState(() {
                 _mostrandoListaProductos = false;
               });
@@ -306,16 +290,14 @@ class _MenuFlotanteWidgetState extends State<MenuFlotanteWidget> {
 
           // 2. Lista de Productos (Scrollable)
           Flexible(
-            // Permite que el ListView ocupe el espacio restante
             child: ListView.builder(
               padding: EdgeInsets.zero,
-              shrinkWrap: true, // Se ajusta al tamaño de los hijos
+              shrinkWrap: true,
               itemCount: _productos.length,
               itemBuilder: (context, index) {
                 final producto = _productos[index];
                 return InkWell(
                   onTap: () {
-                    // Acción: Inyectar este producto específico
                     _inyectarProductoEspecifico(producto);
                   },
                   child: Container(
@@ -343,13 +325,11 @@ class _MenuFlotanteWidgetState extends State<MenuFlotanteWidget> {
       ),
     );
   }
-  // <<<--- FIN: NUEVO WIDGET (Lista de Productos) --- >>>
 
-  // --- WIDGET DE BOTÓN (Sin cambios, la lógica de texto deshabilitado ya funciona) ---
+  // --- WIDGET DE BOTÓN (Sin cambios) ---
   Widget _buildMenuButton(String text, IconData icon, VoidCallback? onPressed) {
     final bool isEnabled = onPressed != null;
 
-    // Determina el texto a mostrar basado en si está habilitado
     String displayText = text;
     if (!isEnabled) {
       if (text == 'Rellenar Cliente' && _clientes.isEmpty) {
@@ -375,7 +355,6 @@ class _MenuFlotanteWidgetState extends State<MenuFlotanteWidget> {
               ),
             ),
             const SizedBox(width: 20),
-            // Usamos Expanded para que el texto no se desborde
             Expanded(
               child: Text(
                 displayText,

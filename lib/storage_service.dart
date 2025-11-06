@@ -7,32 +7,40 @@ import 'models.dart';
 
 // --- LÍMITES DEMO ACTUALIZADOS ---
 const int kMaxDemoProfiles = 2; // Solo 1 perfil
-const int kMaxDemoClients = 5;  // Hasta 5 clientes
+const int kMaxDemoClients = 5; // Hasta 5 clientes
 const int kMaxDemoProducts = 2; // Hasta 2 productos
 
 class StorageService {
   static const String _activationStatusKey = 'activationStatus';
   static const String _profilesKey = 'profiles';
   static const String _currentProfileKey = 'currentProfile';
+  // <<<--- INICIO: NUEVA CONSTANTE --- >>>
+  static const String _lastInvoicedClientIdKey = 'lastInvoicedClientId';
+  // <<<--- FIN: NUEVA CONSTANTE --- >>>
   final _uuid = const Uuid();
 
-  // --- LÓGICA DE LICENCIA ---
+  // --- LÓGICA DE LICENCIA (Sin cambios) ---
   Future<ActivationStatus> getActivationStatus() async {
     final prefs = await SharedPreferences.getInstance();
     final statusString = prefs.getString(_activationStatusKey);
     switch (statusString) {
-      case 'PRO': return ActivationStatus.pro;
-      case 'DEMO': return ActivationStatus.demo;
-      default: return ActivationStatus.none;
+      case 'PRO':
+        return ActivationStatus.pro;
+      case 'DEMO':
+        return ActivationStatus.demo;
+      default:
+        return ActivationStatus.none;
     }
   }
 
   Future<ActivationStatus> activateLicense(String userKey) async {
     final key = userKey.trim().toUpperCase();
     ActivationStatus newStatus = ActivationStatus.none;
-    if (key == LicenseKeys.demoKey) { // Usa la clave de models.dart
+    if (key == LicenseKeys.demoKey) {
+      // Usa la clave de models.dart
       newStatus = ActivationStatus.demo;
-    } else if (LicenseKeys.proKeys.contains(key)) { // Usa la lista de models.dart
+    } else if (LicenseKeys.proKeys.contains(key)) {
+      // Usa la lista de models.dart
       newStatus = ActivationStatus.pro;
     }
     // Solo guarda si la clave es válida (DEMO o PRO)
@@ -44,22 +52,27 @@ class StorageService {
     return newStatus;
   }
 
-  // --- LÓGICA DE DATOS ---
+  // --- LÓGICA DE DATOS (Sin cambios) ---
   Future<Map<String, Perfil>> _loadProfilesData() async {
     final prefs = await SharedPreferences.getInstance();
     String? profilesJson = prefs.getString(_profilesKey);
     Map<String, Perfil> profilesMap = {};
     if (profilesJson == null || profilesJson.isEmpty) {
-      profilesMap = { 'Perfil Predeterminado': Perfil.empty(), };
+      profilesMap = {'Perfil Predeterminado': Perfil.empty()};
       await _saveProfilesData(profilesMap);
       await switchProfile('Perfil Predeterminado');
     } else {
       try {
         Map<String, dynamic> decodedData = jsonDecode(profilesJson);
-        profilesMap = decodedData.map((key, value) => MapEntry(key, Perfil.fromJson(value as Map<String, dynamic>)));
+        profilesMap = decodedData.map(
+          (key, value) =>
+              MapEntry(key, Perfil.fromJson(value as Map<String, dynamic>)),
+        );
       } catch (e) {
-        print("Error decodificando perfiles: $e. Creando perfil predeterminado.");
-        profilesMap = { 'Perfil Predeterminado': Perfil.empty(), };
+        print(
+          "Error decodificando perfiles: $e. Creando perfil predeterminado.",
+        );
+        profilesMap = {'Perfil Predeterminado': Perfil.empty()};
         await _saveProfilesData(profilesMap);
         await switchProfile('Perfil Predeterminado');
       }
@@ -69,7 +82,9 @@ class StorageService {
 
   Future<void> _saveProfilesData(Map<String, Perfil> profilesMap) async {
     final prefs = await SharedPreferences.getInstance();
-    Map<String, dynamic> encodableMap = profilesMap.map((key, value) => MapEntry(key, value.toJson()));
+    Map<String, dynamic> encodableMap = profilesMap.map(
+      (key, value) => MapEntry(key, value.toJson()),
+    );
     await prefs.setString(_profilesKey, jsonEncode(encodableMap));
   }
 
@@ -77,7 +92,8 @@ class StorageService {
     final prefs = await SharedPreferences.getInstance();
     String? current = prefs.getString(_currentProfileKey);
     if (current == null) {
-      final profiles = await _loadProfilesData(); // Asegura que exista al menos uno
+      final profiles =
+          await _loadProfilesData(); // Asegura que exista al menos uno
       current = profiles.keys.first;
       await switchProfile(current); // Guarda el perfil actual si no existía
     }
@@ -92,44 +108,66 @@ class StorageService {
   Future<void> switchProfile(String profileName) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_currentProfileKey, profileName);
+    // <<<--- INICIO: LIMPIAR CLIENTE RECIENTE AL CAMBIAR DE PERFIL --- >>>
+    // Esto asegura que el perfil nuevo no muestre el cliente reciente del perfil anterior
+    await prefs.remove(_lastInvoicedClientIdKey);
+    // <<<--- FIN: LIMPIAR CLIENTE RECIENTE AL CAMBIAR DE PERFIL --- >>>
   }
 
   Future<Perfil> _getCurrentProfile() async {
     final profiles = await _loadProfilesData();
-    final currentProfileName = await getCurrentProfileName(); // Asegura que haya un perfil actual
-    return profiles[currentProfileName] ?? Perfil.empty(); // Devuelve perfil vacío si algo falla
+    final currentProfileName =
+        await getCurrentProfileName(); // Asegura que haya un perfil actual
+    return profiles[currentProfileName] ??
+        Perfil.empty(); // Devuelve perfil vacío si algo falla
   }
 
   Future<List<Cliente>> getClientes() async {
     final profile = await _getCurrentProfile();
-    profile.clients.sort((a, b) => a.nombreCliente.toLowerCase().compareTo(b.nombreCliente.toLowerCase()));
+    profile.clients.sort(
+      (a, b) => a.nombreCliente.toLowerCase().compareTo(
+        b.nombreCliente.toLowerCase(),
+      ),
+    );
     return profile.clients;
   }
 
   Future<List<Producto>> getProductos() async {
     final profile = await _getCurrentProfile();
-    profile.products.sort((a, b) => a.descripcion.toLowerCase().compareTo(b.descripcion.toLowerCase()));
+    profile.products.sort(
+      (a, b) =>
+          a.descripcion.toLowerCase().compareTo(b.descripcion.toLowerCase()),
+    );
     return profile.products;
   }
 
-  // --- Funciones CRUD (CON BLOQUEO ADICIONAL PARA 'NONE') ---
-
+  // --- Funciones CRUD (Sin cambios) ---
   Future<void> saveCliente(Cliente cliente) async {
     final status = await getActivationStatus();
-    if (status == ActivationStatus.none) { throw('Necesitas activar la aplicación (DEMO o PRO) para guardar clientes.'); }
+    if (status == ActivationStatus.none) {
+      throw ('Necesitas activar la aplicación (DEMO o PRO) para guardar clientes.');
+    }
 
     final profiles = await _loadProfilesData();
     final profileName = await getCurrentProfileName();
     final profile = profiles[profileName] ?? Perfil.empty();
 
-    if (status == ActivationStatus.demo && profile.clients.length >= kMaxDemoClients && cliente.id.isEmpty) { throw('Límite DEMO: No puedes agregar más de $kMaxDemoClients clientes.'); }
+    if (status == ActivationStatus.demo &&
+        profile.clients.length >= kMaxDemoClients &&
+        cliente.id.isEmpty) {
+      throw ('Límite DEMO: No puedes agregar más de $kMaxDemoClients clientes.');
+    }
 
     if (cliente.id.isEmpty) {
       cliente.id = _uuid.v4();
       profile.clients.add(cliente);
     } else {
       final index = profile.clients.indexWhere((c) => c.id == cliente.id);
-      if (index != -1) { profile.clients[index] = cliente; } else { profile.clients.add(cliente); } // Fallback: add if not found
+      if (index != -1) {
+        profile.clients[index] = cliente;
+      } else {
+        profile.clients.add(cliente);
+      } // Fallback: add if not found
     }
     profiles[profileName] = profile;
     await _saveProfilesData(profiles);
@@ -137,7 +175,9 @@ class StorageService {
 
   Future<void> deleteCliente(String clienteId) async {
     final status = await getActivationStatus();
-    if (status == ActivationStatus.none) { throw('Necesitas activar la aplicación (DEMO o PRO) para eliminar clientes.'); }
+    if (status == ActivationStatus.none) {
+      throw ('Necesitas activar la aplicación (DEMO o PRO) para eliminar clientes.');
+    }
 
     final profiles = await _loadProfilesData();
     final profileName = await getCurrentProfileName();
@@ -151,20 +191,30 @@ class StorageService {
 
   Future<void> saveProducto(Producto producto) async {
     final status = await getActivationStatus();
-    if (status == ActivationStatus.none) { throw('Necesitas activar la aplicación (DEMO o PRO) para guardar productos.'); }
+    if (status == ActivationStatus.none) {
+      throw ('Necesitas activar la aplicación (DEMO o PRO) para guardar productos.');
+    }
 
     final profiles = await _loadProfilesData();
     final profileName = await getCurrentProfileName();
     final profile = profiles[profileName] ?? Perfil.empty();
 
-    if (status == ActivationStatus.demo && profile.products.length >= kMaxDemoProducts && producto.id.isEmpty) { throw('Límite DEMO: No puedes agregar más de $kMaxDemoProducts productos.'); }
+    if (status == ActivationStatus.demo &&
+        profile.products.length >= kMaxDemoProducts &&
+        producto.id.isEmpty) {
+      throw ('Límite DEMO: No puedes agregar más de $kMaxDemoProducts productos.');
+    }
 
     if (producto.id.isEmpty) {
       producto.id = _uuid.v4();
       profile.products.add(producto);
     } else {
       final index = profile.products.indexWhere((p) => p.id == producto.id);
-      if (index != -1) { profile.products[index] = producto; } else { profile.products.add(producto); } // Fallback: add if not found
+      if (index != -1) {
+        profile.products[index] = producto;
+      } else {
+        profile.products.add(producto);
+      } // Fallback: add if not found
     }
     profiles[profileName] = profile;
     await _saveProfilesData(profiles);
@@ -172,7 +222,9 @@ class StorageService {
 
   Future<void> deleteProducto(String productoId) async {
     final status = await getActivationStatus();
-    if (status == ActivationStatus.none) { throw('Necesitas activar la aplicación (DEMO o PRO) para eliminar productos.'); }
+    if (status == ActivationStatus.none) {
+      throw ('Necesitas activar la aplicación (DEMO o PRO) para eliminar productos.');
+    }
 
     final profiles = await _loadProfilesData();
     final profileName = await getCurrentProfileName();
@@ -186,12 +238,19 @@ class StorageService {
 
   Future<void> addProfile(String profileName) async {
     final status = await getActivationStatus();
-    if (status == ActivationStatus.none) { throw('Necesitas activar la aplicación (DEMO o PRO) para agregar perfiles.'); }
+    if (status == ActivationStatus.none) {
+      throw ('Necesitas activar la aplicación (DEMO o PRO) para agregar perfiles.');
+    }
 
     final profiles = await _loadProfilesData();
-    if (profiles.containsKey(profileName)) { throw('Ya existe un perfil con ese nombre.'); }
+    if (profiles.containsKey(profileName)) {
+      throw ('Ya existe un perfil con ese nombre.');
+    }
 
-    if (status == ActivationStatus.demo && profiles.length >= kMaxDemoProfiles ) { throw('Límite DEMO: Solo puedes tener $kMaxDemoProfiles perfil. Actualiza a PRO para más.'); }
+    if (status == ActivationStatus.demo &&
+        profiles.length >= kMaxDemoProfiles) {
+      throw ('Límite DEMO: Solo puedes tener $kMaxDemoProfiles perfil. Actualiza a PRO para más.');
+    }
 
     profiles[profileName] = Perfil.empty();
     await _saveProfilesData(profiles);
@@ -200,12 +259,16 @@ class StorageService {
 
   Future<void> renameProfile(String newName) async {
     final status = await getActivationStatus();
-    if (status == ActivationStatus.none) { throw('Necesitas activar la aplicación (DEMO o PRO) para renombrar perfiles.'); }
+    if (status == ActivationStatus.none) {
+      throw ('Necesitas activar la aplicación (DEMO o PRO) para renombrar perfiles.');
+    }
 
     final profiles = await _loadProfilesData();
     final oldName = await getCurrentProfileName();
     if (newName.isEmpty || newName == oldName) return;
-    if (profiles.containsKey(newName)) { throw('Ya existe un perfil con ese nombre.'); }
+    if (profiles.containsKey(newName)) {
+      throw ('Ya existe un perfil con ese nombre.');
+    }
     final data = profiles.remove(oldName); // Usa remove para obtener y quitar
     profiles[newName] = data ?? Perfil.empty();
     await _saveProfilesData(profiles);
@@ -214,29 +277,41 @@ class StorageService {
 
   Future<void> deleteProfile() async {
     final status = await getActivationStatus();
-    if (status == ActivationStatus.none) { throw('Necesitas activar la aplicación (DEMO o PRO) para eliminar perfiles.'); }
+    if (status == ActivationStatus.none) {
+      throw ('Necesitas activar la aplicación (DEMO o PRO) para eliminar perfiles.');
+    }
 
     final profiles = await _loadProfilesData();
     final profileToDelete = await getCurrentProfileName();
-    if (profiles.length <= 1) { throw('No puedes eliminar el único perfil existente.'); }
+    if (profiles.length <= 1) {
+      throw ('No puedes eliminar el único perfil existente.');
+    }
     profiles.remove(profileToDelete);
     await _saveProfilesData(profiles);
     await switchProfile(profiles.keys.first);
   }
 
-  // --- Funciones de Importar/Exportar ---
+  // --- Funciones de Importar/Exportar (Sin cambios) ---
   Future<String> exportData() async {
     final status = await getActivationStatus();
-    if (status == ActivationStatus.none) { throw('Necesitas activar la aplicación (DEMO o PRO) para exportar datos.'); }
+    if (status == ActivationStatus.none) {
+      throw ('Necesitas activar la aplicación (DEMO o PRO) para exportar datos.');
+    }
     print("Exportar datos...");
     final profiles = await _loadProfilesData();
     final currentProfile = await getCurrentProfileName();
-    final data = { 'profiles': profiles.map((k, v) => MapEntry(k, v.toJson())), 'currentProfile': currentProfile, };
+    final data = {
+      'profiles': profiles.map((k, v) => MapEntry(k, v.toJson())),
+      'currentProfile': currentProfile,
+    };
     return jsonEncode(data);
   }
+
   Future<void> importData(String jsonString) async {
     final status = await getActivationStatus();
-    if (status == ActivationStatus.none) { throw('Necesitas activar la aplicación (DEMO o PRO) para importar datos.'); }
+    if (status == ActivationStatus.none) {
+      throw ('Necesitas activar la aplicación (DEMO o PRO) para importar datos.');
+    }
     print("Importar datos...");
     try {
       final data = jsonDecode(jsonString) as Map<String, dynamic>;
@@ -249,12 +324,30 @@ class StorageService {
         }
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString(_profilesKey, jsonEncode(data['profiles']));
-        await prefs.setString(_currentProfileKey, data['currentProfile'] as String);
-      } else { throw('El archivo no tiene el formato correcto (faltan claves principales).'); }
+        await prefs.setString(
+          _currentProfileKey,
+          data['currentProfile'] as String,
+        );
+      } else {
+        throw ('El archivo no tiene el formato correcto (faltan claves principales).');
+      }
     } catch (e) {
       print("Error detallado al importar: $e");
-      throw('Error al leer o validar el archivo JSON. Asegúrate de que el formato sea correcto.');
+      throw ('Error al leer o validar el archivo JSON. Asegúrate de que el formato sea correcto.');
     }
   }
 
+  // <<<--- INICIO: NUEVOS MÉTODOS --- >>>
+  /// Guarda el ID del último cliente usado para facturar
+  Future<void> setLastInvoicedClientId(String clientId) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_lastInvoicedClientIdKey, clientId);
+  }
+
+  /// Obtiene el ID del último cliente usado
+  Future<String?> getLastInvoicedClientId() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_lastInvoicedClientIdKey);
+  }
+  // <<<--- FIN: NUEVOS MÉTODOS --- >>>
 } // Fin StorageService
