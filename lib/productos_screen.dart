@@ -13,63 +13,45 @@ const Color dangerColor = Color(0xFFD9534F);
 const Color warningColor = Color(0xFFF0AD4E);
 const Color successColor = Color(0xFF28a745);
 
-// Límite definido en storage_service
-// const int kMaxDemoItems = 2;
-
 class ProductosScreen extends StatefulWidget {
-  // Recibe el estado actual
   final ActivationStatus currentStatus;
-  // <<<--- CAMBIO: Se añade 'key' para que MainScreen pueda encontrar este widget --- >>>
   const ProductosScreen({super.key, required this.currentStatus});
 
   @override
-  // <<<--- CAMBIO: Se hace pública la clase State --- >>>
   State<ProductosScreen> createState() => ProductosScreenState();
 }
 
-// <<<--- CAMBIO: Se hace pública la clase State --- >>>
 class ProductosScreenState extends State<ProductosScreen> {
   final StorageService _storage = StorageService();
   List<Producto> _productos = [];
   bool _isLoading = true;
   Producto? _productoParaEditar;
-
-  // <<<--- INICIO: NUEVA VARIABLE --- >>>
-  String _currentProfileName = ""; // Para guardar el nombre del perfil
-  // <<<--- FIN: NUEVA VARIABLE --- >>>
+  String _currentProfileName = "";
 
   @override
   void initState() {
     super.initState();
-    // <<<--- CAMBIO: Se llama al método público --- >>>
     loadData(widget.currentStatus);
   }
 
   @override
   void didUpdateWidget(covariant ProductosScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Esta función ahora solo recarga si el estado de activación (PRO/DEMO) cambia.
-    // La recarga por cambio de perfil se maneja desde main.dart
     if (widget.currentStatus != oldWidget.currentStatus) {
-      // <<<--- CAMBIO: Se llama al método público --- >>>
       loadData(widget.currentStatus);
     }
   }
 
-  // <<<--- CAMBIO: Método renombrado de _loadData a loadData --- >>>
   Future<void> loadData(ActivationStatus status) async {
-    if (!mounted) return; // Asegurarse que el widget esté montado
+    if (!mounted) return;
     setState(() => _isLoading = true);
     try {
-      // <<<--- INICIO: NUEVA LÓGICA --- >>>
-      // Carga el nombre del perfil Y los productos de ese perfil
       final profileName = await _storage.getCurrentProfileName();
       final productos = await _storage.getProductos();
-      // <<<--- FIN: NUEVA LÓGICA --- >>>
       if (!mounted) return;
       setState(() {
         _productos = productos;
-        _currentProfileName = profileName; // Guarda el nombre del perfil
+        _currentProfileName = profileName;
         _isLoading = false;
         _productoParaEditar = null;
       });
@@ -102,7 +84,6 @@ class ProductosScreenState extends State<ProductosScreen> {
       _showMessage(
         producto.id.isEmpty ? 'Producto guardado.' : 'Producto actualizado.',
       );
-      // <<<--- CAMBIO: Se llama al método público --- >>>
       loadData(widget.currentStatus);
     } catch (e) {
       _showError(e.toString());
@@ -139,7 +120,6 @@ class ProductosScreenState extends State<ProductosScreen> {
       try {
         await _storage.deleteProducto(id);
         _showMessage('Producto eliminado.');
-        // <<<--- CAMBIO: Se llama al método público --- >>>
         loadData(widget.currentStatus);
       } catch (e) {
         _showError(e.toString());
@@ -150,45 +130,30 @@ class ProductosScreenState extends State<ProductosScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
     final bool allowWriteActions =
         widget.currentStatus != ActivationStatus.none;
     final bool isPro = widget.currentStatus == ActivationStatus.pro;
 
     return Scaffold(
-      backgroundColor: colorScheme.background,
+      // <<< CAMBIO: Fondo blanco forzado >>>
+      backgroundColor: colorBlanco,
       appBar: AppBar(
-        // <<<--- INICIO: CAMBIO EN APPBAR --- >>>
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Text('Gestionar Productos'),
-            if (_currentProfileName.isNotEmpty && !_isLoading)
-              Text(
-                _currentProfileName, // Muestra el nombre del perfil
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: colorTextoSecundario,
-                  fontSize: 13,
-                ),
-              ),
-          ],
-        ),
-        // <<<--- FIN: CAMBIO EN APPBAR --- >>>
-        elevation: 0,
-        backgroundColor: colorScheme.background,
+        title: const Text('Gestionar Productos'),
+        // <<< CAMBIO: Eliminados elevation y backgroundColor para usar tema >>>
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : ListView(
               padding: const EdgeInsets.all(16.0),
               children: [
+                _buildProfileSection(theme),
+                const SizedBox(height: 24),
                 Card(
                   child: Padding(
                     padding: const EdgeInsets.all(20.0),
                     child: _ProductoForm(
                       key: ValueKey(_productoParaEditar?.id ?? 'nuevo'),
-                      status: widget.currentStatus, // Pasa el status actual
+                      status: widget.currentStatus,
                       productoInicial: _productoParaEditar,
                       onSave: _onSaveProducto,
                       onCancel: () {
@@ -202,8 +167,6 @@ class ProductosScreenState extends State<ProductosScreen> {
                 const SizedBox(height: 24),
                 Text('Ítems Guardados', style: theme.textTheme.titleMedium),
                 const SizedBox(height: 16),
-
-                // Mensaje de Límite DEMO (si aplica)
                 if (widget.currentStatus == ActivationStatus.demo &&
                     _productos.length >= kMaxDemoProducts)
                   Padding(
@@ -225,7 +188,6 @@ class ProductosScreenState extends State<ProductosScreen> {
                       ),
                     ),
                   ),
-
                 _productos.isEmpty
                     ? Center(
                         child: Padding(
@@ -308,11 +270,50 @@ class ProductosScreenState extends State<ProductosScreen> {
             ),
     );
   }
-}
-// El resto del archivo (_ProductoForm) no necesita cambios
-// ... (resto del archivo _ProductoForm sin cambios) ...
 
-// --- CLASE _ProductoForm (AJUSTADA PARA EL TEMA CLARO Y BLOQUEO NONE) ---
+  Widget _buildProfileSection(ThemeData theme) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: colorCelestePastel.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: colorCelestePastel.withOpacity(0.3)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.account_circle, color: colorAzulActivo, size: 28),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'PERFIL ACTIVO',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colorAzulActivo,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.0,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _currentProfileName,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// --- CLASE _ProductoForm (Sin cambios) ---
 class _ProductoForm extends StatefulWidget {
   final ActivationStatus status;
   final Producto? productoInicial;
@@ -390,7 +391,6 @@ class _ProductoFormState extends State<_ProductoForm> {
         descripcion: _descripcionCtrl.text,
         precio: _precioCtrl.text,
       );
-      final wasEditing = _isEditing;
       _resetForm();
       widget.onSave(productoActualizado);
     }
@@ -472,7 +472,6 @@ class _ProductoFormState extends State<_ProductoForm> {
                     ],
                   ),
                   const SizedBox(height: 18),
-                  // <<< CORRECCIÓN: Añadir controller y label >>>
                   _buildTextFormField(
                     controller: _descripcionCtrl,
                     label: 'Producto o Servicio*',
@@ -480,7 +479,6 @@ class _ProductoFormState extends State<_ProductoForm> {
                         (val == null || val.isEmpty) ? 'Campo requerido' : null,
                   ),
                   const SizedBox(height: 18),
-                  // <<< CORRECCIÓN: Añadir controller y label >>>
                   _buildTextFormField(
                     controller: _precioCtrl,
                     label: 'Precio Unitario (\$)*',
@@ -488,9 +486,7 @@ class _ProductoFormState extends State<_ProductoForm> {
                       decimal: true,
                     ),
                     inputFormatters: [
-                      FilteringTextInputFormatter.allow(
-                        RegExp(r'^\d+\.?\d*'), // Permite decimales ilimitados
-                      ),
+                      FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d*')),
                     ],
                     validator: (val) {
                       if (val == null || val.isEmpty) return 'Campo requerido';
@@ -542,7 +538,6 @@ class _ProductoFormState extends State<_ProductoForm> {
     );
   }
 
-  // Widgets _buildTextFormField y _buildDropdown (sin cambios)
   Widget _buildTextFormField({
     required TextEditingController controller,
     required String label,
@@ -550,7 +545,6 @@ class _ProductoFormState extends State<_ProductoForm> {
     List<TextInputFormatter>? inputFormatters,
     String? Function(String?)? validator,
   }) {
-    final theme = Theme.of(context);
     return TextFormField(
       controller: controller,
       keyboardType: keyboardType,
@@ -595,4 +589,4 @@ class _ProductoFormState extends State<_ProductoForm> {
       isExpanded: true,
     );
   }
-} // Fin de _ProductoFormState
+}

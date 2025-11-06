@@ -1,6 +1,6 @@
 // lib/correo_screen.dart
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart'; // <<<--- INICIO: NUEVA IMPORTACIÓN
+import 'package:url_launcher/url_launcher.dart';
 import 'models.dart';
 import 'storage_service.dart';
 import 'main.dart'; // Para los colores
@@ -17,16 +17,46 @@ class CorreoScreenState extends State<CorreoScreen> {
   final StorageService _storage = StorageService();
   bool _isLoading = true;
   Cliente? _recentClient;
-  List<Cliente> _otherClients = [];
+  List<Cliente> _allClients = [];
+  List<Cliente> _filteredClients = [];
   String _currentProfileName = "";
+  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     loadData();
+    _searchController.addListener(_onSearchChanged);
   }
 
-  // Método público para ser llamado desde main.dart
+  @override
+  void dispose() {
+    _searchController.removeListener(_onSearchChanged);
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _onSearchChanged() {
+    _filterClients(_searchController.text);
+  }
+
+  void _filterClients(String query) {
+    if (query.isEmpty) {
+      setState(() {
+        _filteredClients = _allClients;
+      });
+      return;
+    }
+
+    final lowerQuery = query.toLowerCase();
+    setState(() {
+      _filteredClients = _allClients.where((client) {
+        return client.nombreCliente.toLowerCase().contains(lowerQuery) ||
+            client.email.toLowerCase().contains(lowerQuery);
+      }).toList();
+    });
+  }
+
   Future<void> loadData() async {
     if (!mounted) return;
     setState(() => _isLoading = true);
@@ -37,44 +67,38 @@ class CorreoScreenState extends State<CorreoScreen> {
       final profileName = await _storage.getCurrentProfileName();
 
       Cliente? foundRecent;
-      List<Cliente> foundOthers = [];
-
       if (recentClientId != null) {
-        // Separa al cliente reciente de los demás
-        for (var client in allClients) {
-          if (client.id == recentClientId) {
-            foundRecent = client;
-          } else {
-            foundOthers.add(client);
-          }
+        try {
+          foundRecent = allClients.firstWhere((c) => c.id == recentClientId);
+        } catch (e) {
+          foundRecent = null;
         }
-      } else {
-        // Si no hay cliente reciente, todos son "otros"
-        foundOthers = allClients;
       }
 
       if (!mounted) return;
       setState(() {
         _recentClient = foundRecent;
-        _otherClients = foundOthers;
+        _allClients = allClients;
+        _filteredClients = allClients;
         _currentProfileName = profileName;
         _isLoading = false;
       });
+      if (_searchController.text.isNotEmpty) {
+        _filterClients(_searchController.text);
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() => _isLoading = false);
-      _showError('Error al cargar clientes: ${e.toString()}');
+      print("Error cargando datos en CorreoScreen: $e");
     }
   }
 
-  // <<<--- INICIO: NUEVA FUNCIÓN PARA ABRIR CORREO --- >>>
   Future<void> _launchEmailApp(Cliente cliente) async {
     if (cliente.email.isEmpty) {
       _showError('Este cliente no tiene un correo electrónico registrado.');
       return;
     }
 
-    // 1. Definir Asunto y Cuerpo
     const String subject = "Documento Tributario Electrónico";
     final String body =
         """
@@ -86,9 +110,6 @@ A continuación le adjunto su factura electrónica.
 Saludos.
 """;
 
-    // 2. Crear el URI de mailto
-    // Usamos Uri.encodeComponent para asegurar que los espacios y saltos de línea
-    // se conviertan a un formato válido para URL.
     final Uri mailtoUri = Uri(
       scheme: 'mailto',
       path: cliente.email,
@@ -96,11 +117,8 @@ Saludos.
           'subject=${Uri.encodeComponent(subject)}&body=${Uri.encodeComponent(body)}',
     );
 
-    // 3. Lanzar la URL
     try {
-      if (await canLaunchUrl(mailtoUri)) {
-        await launchUrl(mailtoUri);
-      } else {
+      if (!await launchUrl(mailtoUri, mode: LaunchMode.externalApplication)) {
         throw Exception('No se pudo abrir la app de correo.');
       }
     } catch (e) {
@@ -114,7 +132,6 @@ Saludos.
       SnackBar(content: Text(message), backgroundColor: Colors.red),
     );
   }
-  // <<<--- FIN: NUEVA FUNCIÓN PARA ABRIR CORREO --- >>>
 
   @override
   Widget build(BuildContext context) {
@@ -123,81 +140,70 @@ Saludos.
     return Scaffold(
       backgroundColor: colorBlanco,
       appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Text('Correo'), // Título principal
-            if (_currentProfileName.isNotEmpty && !_isLoading)
-              Text(
-                _currentProfileName, // Muestra el nombre del perfil
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: colorTextoSecundario,
-                  fontSize: 13,
-                ),
-              ),
-          ],
-        ),
+        title: const Text('Correo'),
+        // <<< CAMBIO: Se eliminaron elevation, backgroundColor y foregroundColor
+        // para usar los valores por defecto del tema (igual que Inicio) >>>
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
-              onRefresh: loadData, // Permite refrescar la lista
+              onRefresh: loadData,
               child: ListView(
                 padding: const EdgeInsets.all(16.0),
                 children: [
-                  // --- Sección Cliente Reciente ---
+                  _buildProfileSection(theme),
+                  const SizedBox(height: 24),
                   Text(
                     'Facturado Recientemente',
-                    style: theme.textTheme.titleMedium,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   const SizedBox(height: 12),
                   _recentClient == null
-                      ? Container(
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            color: colorGrisClaro.withOpacity(0.5),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Center(
-                            child: Text(
-                              'Ningún cliente seleccionado recientemente.',
-                              style: theme.textTheme.bodyMedium,
-                            ),
-                          ),
+                      ? _buildEmptyStateCard(
+                          theme,
+                          'Ningún cliente seleccionado recientemente.',
                         )
                       : _buildClientCard(theme, _recentClient!),
-
-                  // --- Sección Todos los Clientes ---
-                  Padding(
-                    padding: const EdgeInsets.only(top: 24.0, bottom: 12.0),
-                    child: Text(
-                      'Directorio de Clientes',
-                      style: theme.textTheme.titleMedium,
+                  const SizedBox(height: 24),
+                  Text(
+                    'Directorio de Clientes',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
-                  _otherClients.isEmpty && _recentClient != null
-                      ? Container(
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            color: colorGrisClaro.withOpacity(0.5),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Center(
-                            child: Text(
-                              'No hay otros clientes en este perfil.',
-                              style: theme.textTheme.bodyMedium,
-                            ),
-                          ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _searchController,
+                    decoration: InputDecoration(
+                      hintText: 'Buscar cliente...',
+                      prefixIcon: const Icon(Icons.search, color: Colors.grey),
+                      filled: true,
+                      fillColor: colorGrisClaro,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  _filteredClients.isEmpty
+                      ? _buildEmptyStateCard(
+                          theme,
+                          _allClients.isEmpty
+                              ? 'No hay clientes en este perfil.'
+                              : 'No se encontraron resultados.',
                         )
                       : ListView.builder(
                           shrinkWrap: true,
                           physics: const NeverScrollableScrollPhysics(),
-                          itemCount: _otherClients.length,
+                          itemCount: _filteredClients.length,
                           itemBuilder: (context, index) {
                             return _buildClientCard(
                               theme,
-                              _otherClients[index],
+                              _filteredClients[index],
                             );
                           },
                         ),
@@ -207,26 +213,78 @@ Saludos.
     );
   }
 
-  /// Construye el Card para un cliente
+  Widget _buildProfileSection(ThemeData theme) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: colorCelestePastel.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: colorCelestePastel.withOpacity(0.3)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.account_circle, color: colorAzulActivo, size: 28),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'PERFIL ACTIVO',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colorAzulActivo,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.0,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _currentProfileName,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyStateCard(ThemeData theme, String message) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: colorGrisClaro.withOpacity(0.5),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Center(
+        child: Text(
+          message,
+          style: theme.textTheme.bodyMedium?.copyWith(color: Colors.grey),
+          textAlign: TextAlign.center,
+        ),
+      ),
+    );
+  }
+
   Widget _buildClientCard(ThemeData theme, Cliente cliente) {
     return Card(
       key: ValueKey(cliente.id),
       elevation: 0,
-      color: colorGrisClaro, // Color de fondo gris claro
+      color: colorGrisClaro,
       margin: const EdgeInsets.only(bottom: 8),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: InkWell(
-        // <<<--- INICIO: CAMBIO EN ONTAP --- >>>
-        onTap: () {
-          // Acción al tocar el card (lanzar app de correo)
-          _launchEmailApp(cliente);
-        },
-        // <<<--- FIN: CAMBIO EN ONTAP --- >>>
+        onTap: () => _launchEmailApp(cliente),
         borderRadius: BorderRadius.circular(12),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16.0),
           child: Row(
             children: [
-              // Columna de información (Nombre y Correo)
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -236,22 +294,36 @@ Saludos.
                           ? cliente.nombreCliente
                           : '(Cliente sin nombre)',
                       style: theme.textTheme.bodyLarge?.copyWith(
-                        fontWeight: FontWeight.w500,
+                        fontWeight: FontWeight.w600,
                       ),
                       overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      cliente.email.isNotEmpty ? cliente.email : '(Sin correo)',
-                      style: theme.textTheme.bodyMedium,
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                    if (cliente.email.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        cliente.email,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: colorTextoSecundario,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                   ],
                 ),
               ),
-              // Icono de Correo a la derecha
               const SizedBox(width: 16),
-              Icon(Icons.mail_outline, color: colorTextoSecundario),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: colorBlanco,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.mail_outline_rounded,
+                  color: colorAzulActivo,
+                  size: 24,
+                ),
+              ),
             ],
           ),
         ),

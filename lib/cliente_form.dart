@@ -103,7 +103,6 @@ class _ClienteFormState extends State<ClienteForm> {
 
   @override
   void dispose() {
-    // ... (disposers sin cambios) ...
     _nombreClienteCtrl.dispose();
     _nitCtrl.dispose();
     _nrcCtrl.dispose();
@@ -121,13 +120,14 @@ class _ClienteFormState extends State<ClienteForm> {
   }
 
   void _guardar() {
-    // Primero, valida el formulario
+    // Primero, valida el formulario estándar
     if (!_formKey.currentState!.validate()) {
-      return; // Detiene si hay errores de validación (ej. NIT incompleto)
+      return;
     }
 
-    // Segundo, valida la lógica de Departamento
-    if ((_paisCtrl.text.toUpperCase() == 'EL SALVADOR' || _paisCtrl.text.isEmpty) &&
+    // Segundo, valida la lógica específica de Departamento para El Salvador
+    if ((_paisCtrl.text.toUpperCase() == 'EL SALVADOR' ||
+            _paisCtrl.text.isEmpty) &&
         _selectedDepartamento == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -185,7 +185,8 @@ class _ClienteFormState extends State<ClienteForm> {
     final theme = Theme.of(context);
     // Detecta si el país es "EL SALVADOR" para mostrar/ocultar Depto/Municipio
     final bool esElSalvador =
-    (_paisCtrl.text.toUpperCase() == 'EL SALVADOR' || _paisCtrl.text.isEmpty);
+        (_paisCtrl.text.toUpperCase() == 'EL SALVADOR' ||
+        _paisCtrl.text.isEmpty);
 
     return Card(
       child: Padding(
@@ -204,8 +205,8 @@ class _ClienteFormState extends State<ClienteForm> {
               _buildTextFormField(
                 controller: _nombreClienteCtrl,
                 label: 'Nombre del Cliente*',
-                inputFormatters: [LettersOnlyInputFormatter()],
-                // Validador estándar para campos requeridos
+                // <<< CAMBIO: Usar NameInputFormatter para permitir puntuación >>>
+                inputFormatters: [NameInputFormatter()],
                 validator: (val) {
                   if (val == null || val.isEmpty) {
                     return 'Campo requerido';
@@ -215,7 +216,7 @@ class _ClienteFormState extends State<ClienteForm> {
               ),
               const SizedBox(height: 16),
               Row(
-                crossAxisAlignment: CrossAxisAlignment.start, // Alinea los campos
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(
                     child: _buildTextFormField(
@@ -226,19 +227,15 @@ class _ClienteFormState extends State<ClienteForm> {
                         FilteringTextInputFormatter.digitsOnly,
                         NitInputFormatter(),
                       ],
-                      // <<< INICIO: VALIDACIÓN DE NIT >>>
                       validator: (value) {
-                        // Permite que el campo esté vacío
                         if (value == null || value.isEmpty) {
                           return null;
                         }
-                        // Si no está vacío, exige la longitud completa
                         if (value.length < 17) {
                           return 'NIT debe tener 14 dígitos';
                         }
-                        return null; // Está bien
+                        return null;
                       },
-                      // <<< FIN: VALIDACIÓN DE NIT >>>
                     ),
                   ),
                   const SizedBox(width: 16),
@@ -246,12 +243,8 @@ class _ClienteFormState extends State<ClienteForm> {
                     child: _buildTextFormField(
                       controller: _nrcCtrl,
                       label: 'NRC',
-                      // <<< INICIO: CAMBIOS PARA NRC >>>
-                      keyboardType: TextInputType.text, // Para permitir el guion
-                      inputFormatters: [
-                        NrcInputFormatter(), // Aplicar el nuevo formateador
-                      ],
-                      // <<< FIN: CAMBIOS PARA NRC >>>
+                      keyboardType: TextInputType.text,
+                      inputFormatters: [NrcInputFormatter()],
                     ),
                   ),
                 ],
@@ -260,7 +253,8 @@ class _ClienteFormState extends State<ClienteForm> {
               _buildTextFormField(
                 controller: _nombreComercialCtrl,
                 label: 'Nombre Comercial',
-                inputFormatters: [LettersOnlyInputFormatter()],
+                // <<< CAMBIO: Usar NameInputFormatter para permitir puntuación >>>
+                inputFormatters: [NameInputFormatter()],
               ),
               const SizedBox(height: 16),
               _buildAutoComplete(
@@ -281,7 +275,6 @@ class _ClienteFormState extends State<ClienteForm> {
                 onSelected: (selection) {
                   setState(() {
                     _paisCtrl.text = selection;
-                    // Limpia Depto/Municipio si el país cambia y no es SV
                     if (selection.toUpperCase() != 'EL SALVADOR') {
                       _selectedDepartamento = null;
                       _selectedMunicipio = null;
@@ -291,20 +284,15 @@ class _ClienteFormState extends State<ClienteForm> {
                 },
               ),
               const SizedBox(height: 16),
-              // --- LÓGICA CONDICIONAL ---
-// --- LÓGICA CONDICIONAL ---
-              // Muestra Depto/Municipio SOLO si es El Salvador
               if (esElSalvador)
-                Column( // <<< CAMBIO: de Row a Column
+                Column(
                   children: [
-                    _buildDropdown( // <<< CAMBIO: Se quitó Expanded
+                    _buildDropdown(
                       label: 'Departamento*',
                       value: _selectedDepartamento,
-                      items:
-                      kDepartamentos,
+                      items: kDepartamentos,
                       onChanged: _onDepartamentoChanged,
                       hintText: 'Selecciona departamento',
-                      // Validador estándar para campos requeridos
                       validator: (val) {
                         if (esElSalvador && (val == null || val.isEmpty)) {
                           return 'Requerido';
@@ -312,12 +300,11 @@ class _ClienteFormState extends State<ClienteForm> {
                         return null;
                       },
                     ),
-                    const SizedBox(height: 16), // <<< CAMBIO: de width a height
-                    _buildDropdown( // <<< CAMBIO: Se quitó Expanded
+                    const SizedBox(height: 16),
+                    _buildDropdown(
                       label: 'Municipio',
                       value: _selectedMunicipio,
-                      items:
-                      _municipiosDelDepartamentoSeleccionado,
+                      items: _municipiosDelDepartamentoSeleccionado,
                       onChanged: (val) {
                         setState(() => _selectedMunicipio = val);
                       },
@@ -328,15 +315,15 @@ class _ClienteFormState extends State<ClienteForm> {
                   ],
                 ),
               if (esElSalvador) const SizedBox(height: 16),
-              Column( // <<< CAMBIO: de Row a Column
+              Column(
                 children: [
-                  _buildTextFormField( // <<< CAMBIO: Se quitó Expanded
+                  _buildTextFormField(
                     controller: _emailCtrl,
                     label: 'Correo Electrónico',
                     keyboardType: TextInputType.emailAddress,
                   ),
-                  const SizedBox(height: 16), // <<< CAMBIO: de width a height
-                  _buildTextFormField( // <<< CAMBIO: Se quitó Expanded
+                  const SizedBox(height: 16),
+                  _buildTextFormField(
                     controller: _telefonoCtrl,
                     label: 'Teléfono',
                     keyboardType: TextInputType.number,
@@ -347,8 +334,6 @@ class _ClienteFormState extends State<ClienteForm> {
                   ),
                 ],
               ),
-
-
               const SizedBox(height: 16),
               ExpansionTile(
                 title: Text(
@@ -359,7 +344,7 @@ class _ClienteFormState extends State<ClienteForm> {
                 childrenPadding: const EdgeInsets.only(top: 16),
                 children: [
                   Row(
-                    crossAxisAlignment: CrossAxisAlignment.start, // Alinea
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(
                         child: _buildTextFormField(
@@ -371,7 +356,9 @@ class _ClienteFormState extends State<ClienteForm> {
                             DuiInputFormatter(),
                           ],
                           validator: (value) {
-                            if (value != null && value.isNotEmpty && value.length < 10) {
+                            if (value != null &&
+                                value.isNotEmpty &&
+                                value.length < 10) {
                               return 'DUI incompleto';
                             }
                             return null;
@@ -389,7 +376,7 @@ class _ClienteFormState extends State<ClienteForm> {
                   ),
                   const SizedBox(height: 16),
                   Row(
-                    crossAxisAlignment: CrossAxisAlignment.start, // Alinea
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(
                         child: _buildTextFormField(
@@ -409,7 +396,9 @@ class _ClienteFormState extends State<ClienteForm> {
                   const SizedBox(height: 16),
                   _buildDropdown(
                     label: 'Tipo Persona (Exportación)',
-                    value: _cliente.tipoPersona.isEmpty ? null : _cliente.tipoPersona, // Maneja valor vacío
+                    value: _cliente.tipoPersona.isEmpty
+                        ? null
+                        : _cliente.tipoPersona,
                     items: ['NATURAL', 'JURÍDICA'],
                     onChanged: (val) {
                       if (val != null) {
@@ -457,7 +446,7 @@ class _ClienteFormState extends State<ClienteForm> {
       controller: controller,
       keyboardType: keyboardType,
       inputFormatters: inputFormatters,
-      validator: validator, // Usa el validador que le pasamos
+      validator: validator,
       decoration: InputDecoration(
         labelText: label,
         floatingLabelBehavior: FloatingLabelBehavior.auto,
@@ -488,29 +477,27 @@ class _ClienteFormState extends State<ClienteForm> {
         if (onSelected != null) {
           onSelected(selection);
         }
-        // Quita el foco después de seleccionar
         FocusManager.instance.primaryFocus?.unfocus();
       },
       fieldViewBuilder:
           (context, fieldController, focusNode, onFieldSubmitted) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (fieldController.text != controller.text) {
-            fieldController.text = controller.text;
-          }
-        });
-        return TextFormField(
-            controller: fieldController,
-            focusNode: focusNode,
-            decoration: InputDecoration(labelText: label),
-            onChanged: (value) {
-              controller.text = value;
-              // Llama a onSelected (que es setState) para actualizar la UI en tiempo real
-              if (onSelected != null) {
-                onSelected(value);
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (fieldController.text != controller.text) {
+                fieldController.text = controller.text;
               }
-            }
-        );
-      },
+            });
+            return TextFormField(
+              controller: fieldController,
+              focusNode: focusNode,
+              decoration: InputDecoration(labelText: label),
+              onChanged: (value) {
+                controller.text = value;
+                if (onSelected != null) {
+                  onSelected(value);
+                }
+              },
+            );
+          },
       optionsViewBuilder: (context, onSelected, options) {
         return Align(
           alignment: Alignment.topLeft,
@@ -547,11 +534,11 @@ class _ClienteFormState extends State<ClienteForm> {
     required List<String> items,
     required Function(String?) onChanged,
     String? hintText,
-    String? Function(String?)? validator, // Añadido validador
+    String? Function(String?)? validator,
   }) {
     final theme = Theme.of(context);
-    // Asegura que el valor sea null si no está en la lista (evita error de Flutter)
-    final String? currentValue = (value != null && value.isNotEmpty && items.contains(value))
+    final String? currentValue =
+        (value != null && value.isNotEmpty && items.contains(value))
         ? value
         : null;
 
@@ -560,10 +547,10 @@ class _ClienteFormState extends State<ClienteForm> {
       items: items
           .map(
             (String item) => DropdownMenuItem(
-          value: item,
-          child: Text(item, overflow: TextOverflow.ellipsis),
-        ),
-      )
+              value: item,
+              child: Text(item, overflow: TextOverflow.ellipsis),
+            ),
+          )
           .toList(),
       onChanged: items.isEmpty ? null : onChanged,
       decoration: InputDecoration(
@@ -572,7 +559,7 @@ class _ClienteFormState extends State<ClienteForm> {
         hintStyle: TextStyle(color: theme.disabledColor),
       ),
       isExpanded: true,
-      validator: validator, // Usa el validador que le pasamos
+      validator: validator,
     );
   }
-} // Fin _ClienteFormState
+}

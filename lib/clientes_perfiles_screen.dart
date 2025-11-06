@@ -14,12 +14,7 @@ const Color warningColor = Color(0xFFF0AD4E);
 const Color successColor = Color(0xFF28a745);
 const Color tealColor = Colors.teal;
 
-// Límites definidos en storage_service
-// const int kMaxDemoProfiles = 1;
-// const int kMaxDemoClients = 5;
-
 class ClientesPerfilesScreen extends StatefulWidget {
-  // Recibe el estado actual
   final ActivationStatus currentStatus;
   const ClientesPerfilesScreen({super.key, required this.currentStatus});
 
@@ -34,7 +29,6 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
   String? _perfilActivo;
   List<Cliente> _clientes = [];
   bool _isLoading = true;
-  // Ya no necesitamos _activationStatus local
   Cliente? _clienteParaEditar;
   bool _mostrarFormCliente = false;
 
@@ -273,7 +267,6 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
     final secondaryButtonStyle = OutlinedButton.styleFrom(
       foregroundColor: colorTextoPrincipal.withOpacity(0.8),
       side: BorderSide(color: Colors.grey[300]!),
@@ -286,11 +279,11 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
     final bool isPro = widget.currentStatus == ActivationStatus.pro;
 
     return Scaffold(
-      backgroundColor: colorScheme.background,
+      // <<< CAMBIO: Fondo blanco forzado >>>
+      backgroundColor: colorBlanco,
       appBar: AppBar(
         title: const Text('Clientes y Perfiles'),
-        elevation: 0,
-        backgroundColor: colorScheme.background,
+        // <<< CAMBIO: Eliminados elevation y backgroundColor para usar tema >>>
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -312,7 +305,7 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
-                            'VERSIÓN LIMITADA: Límite de ${kMaxDemoProfiles} perfil.', // <<< CAMBIO AQUÍ
+                            'VERSIÓN LIMITADA: Límite de ${kMaxDemoProfiles} perfiles.',
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               color: Colors.orange[800],
@@ -566,7 +559,11 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
                                         ),
                                         const SizedBox(height: 2),
                                         Text(
-                                          cliente.nit,
+                                          cliente.nit.isNotEmpty
+                                              ? cliente.nit
+                                              : (cliente.dui.isNotEmpty
+                                                    ? cliente.dui
+                                                    : 'Sin documento'),
                                           style: theme.textTheme.bodyMedium,
                                         ),
                                       ],
@@ -598,7 +595,6 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
     );
   }
 
-  // Helper Card
   Widget _buildSectionCard({required String title, required Widget child}) {
     final theme = Theme.of(context);
     return Card(
@@ -615,4 +611,4 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
       ),
     );
   }
-} // Fin _ClientesPerfilesScreenState
+}

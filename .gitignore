@@ -1,45 +1,143 @@
-# Miscellaneous
-*.class
-*.log
-*.pyc
-*.swp
-.DS_Store
-.atom/
-.build/
-.buildlog/
-.history
-.svn/
-.swiftpm/
-migrate_working_dir/
+# ==============================
+# Flutter / Dart
+# ==============================
+.dart_tool/
+.packages
+.pub/
+.pub-cache/
+build/
+coverage/
+flutter_*.png
+*.flutter-plugins
+*.flutter-plugins-dependencies
 
-# IntelliJ related
+# Generated files
+**/GeneratedPluginRegistrant.*
+**/generated_plugin_registrant.*
+**/generated_plugins.cmake
+**/flutter_export_environment.sh
+
+# ==============================
+# Android
+# ==============================
+**/android/.gradle/
+**/android/app/build/
+**/android/local.properties
+**/android/gradle/
+**/android/gradlew
+**/android/gradlew.bat
+**/android/gradle-wrapper.jar
+**/android/gradle-wrapper.properties
+**/android/.idea/
+
+# ==============================
+# iOS
+# ==============================
+ios/Flutter/App.framework
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+ios/Flutter/Generated.xcconfig
+ios/Flutter/ephemeral/
+ios/Pods/
+ios/.symlinks/
+ios/Runner.xcworkspace/
+ios/Runner.xcodeproj/project.xcworkspace/
+ios/Runner.xcodeproj/xcuserdata/
+ios/RunnerTests/
+ios/Flutter/App.xcconfig
+
+# Keep essential iOS source files
+!ios/Runner/AppDelegate.swift
+!ios/Runner/Info.plist
+!ios/Runner/GeneratedPluginRegistrant.h
+!ios/Runner/GeneratedPluginRegistrant.m
+!ios/Runner/Assets.xcassets/
+!ios/Runner/Base.lproj/
+
+# ==============================
+# macOS
+# ==============================
+macos/Flutter/ephemeral/
+macos/Pods/
+macos/Runner.xcworkspace/
+macos/Runner.xcodeproj/xcuserdata/
+macos/Flutter/GeneratedPluginRegistrant.swift
+macos/RunnerTests/
+
+# Keep essential macOS source files
+!macos/Runner/AppDelegate.swift
+!macos/Runner/MainFlutterWindow.swift
+!macos/Runner/Info.plist
+!macos/Runner/Assets.xcassets/
+!macos/Runner/Base.lproj/
+!macos/Runner/Configs/
+
+# ==============================
+# Linux
+# ==============================
+linux/flutter/ephemeral/
+linux/Flutter/GeneratedPluginRegistrant.*
+linux/Flutter/GeneratedPlugins.cmake
+linux/CMakeFiles/
+linux/Makefile
+**/build/
+
+# Keep essential Linux source files
+!linux/flutter/CMakeLists.txt
+!linux/runner/**
+
+# ==============================
+# Windows
+# ==============================
+windows/flutter/ephemeral/
+windows/runner/Debug/
+windows/runner/Release/
+windows/CMakeFiles/
+windows/Makefile
+**/build/
+
+# Keep essential Windows source files
+!windows/flutter/CMakeLists.txt
+!windows/runner/**
+
+# ==============================
+# Web
+# ==============================
+web/.dart_tool/
+web/.idea/
+web/build/
+
+# ==============================
+# IDE / Editor
+# ==============================
+.idea/
+.vscode/
 *.iml
 *.ipr
 *.iws
-.idea/
 
-# The .vscode folder contains launch configuration and tasks you configure in
-# VS Code which you may wish to be included in version control, so this line
-# is commented out by default.
-#.vscode/
+# ==============================
+# Logs / Temp
+# ==============================
+*.log
+*.tmp
+*.bak
+*.lock
+*.orig
+*.class
+*.swp
 
-# Flutter/Dart/Pub related
-**/doc/api/
-**/ios/Flutter/.last_build_id
-.dart_tool/
-.flutter-plugins-dependencies
-.pub-cache/
-.pub/
-/build/
-/coverage/
+# ==============================
+# macOS system files
+# ==============================
+.DS_Store
 
-# Symbolication related
-app.*.symbols
-
-# Obfuscation related
-app.*.map.json
-
-# Android Studio will place build artifacts here
-/android/app/debug
-/android/app/profile
-/android/app/release
+# ==============================
+# Fastlane / Firebase
+# ==============================
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/**/*.png
+fastlane/test_output
+google-services.json
+GoogleService-Info.plist

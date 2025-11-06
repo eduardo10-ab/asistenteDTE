@@ -5,8 +5,13 @@ import 'package:flutter/services.dart';
 class PhoneInputFormatter extends TextInputFormatter {
   @override
   TextEditingValue formatEditUpdate(
-      TextEditingValue oldValue, TextEditingValue newValue) {
-    final text = newValue.text.replaceAll(RegExp(r'\D'), ''); // Remove non-digits
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final text = newValue.text.replaceAll(
+      RegExp(r'\D'),
+      '',
+    ); // Remove non-digits
     if (text.length > 8) {
       return oldValue; // Prevent typing more than 8 digits
     }
@@ -30,8 +35,13 @@ class PhoneInputFormatter extends TextInputFormatter {
 class DuiInputFormatter extends TextInputFormatter {
   @override
   TextEditingValue formatEditUpdate(
-      TextEditingValue oldValue, TextEditingValue newValue) {
-    final text = newValue.text.replaceAll(RegExp(r'\D'), ''); // Remove non-digits
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final text = newValue.text.replaceAll(
+      RegExp(r'\D'),
+      '',
+    ); // Remove non-digits
     if (text.length > 9) {
       return oldValue; // Prevent typing more than 9 digits
     }
@@ -51,13 +61,17 @@ class DuiInputFormatter extends TextInputFormatter {
   }
 }
 
-// Formatter for ####-######-###-# (NIT) - VERSIÓN CORREGIDA DE 14 DÍGITOS
+// Formatter for ####-######-###-# (NIT)
 class NitInputFormatter extends TextInputFormatter {
   @override
   TextEditingValue formatEditUpdate(
-      TextEditingValue oldValue, TextEditingValue newValue) {
-    final text = newValue.text.replaceAll(RegExp(r'\D'), ''); // Remove non-digits
-    // 4 + 6 + 3 + 1 = 14 digits
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final text = newValue.text.replaceAll(
+      RegExp(r'\D'),
+      '',
+    ); // Remove non-digits
     if (text.length > 14) {
       return oldValue; // Prevent typing more than 14 digits
     }
@@ -65,11 +79,14 @@ class NitInputFormatter extends TextInputFormatter {
     String newText = '';
     for (int i = 0; i < text.length; i++) {
       newText += text[i];
-      if (i == 3 && text.length > 4) { // First hyphen
+      if (i == 3 && text.length > 4) {
+        // First hyphen
         newText += '-';
-      } else if (i == 9 && text.length > 10) { // Second hyphen (4 + 6 = 10 digits before)
+      } else if (i == 9 && text.length > 10) {
+        // Second hyphen
         newText += '-';
-      } else if (i == 12 && text.length > 13) { // Third hyphen (4 + 6 + 3 = 13 digits before)
+      } else if (i == 12 && text.length > 13) {
+        // Third hyphen
         newText += '-';
       }
     }
@@ -81,35 +98,25 @@ class NitInputFormatter extends TextInputFormatter {
   }
 }
 
-// <<< --- INICIO: NUEVO FORMATEADOR PARA NRC --- >>>
 // Formateador flexible para NRC (ej. 123456-7 o 161-9)
-// Añade un guion antes del último dígito.
 class NrcInputFormatter extends TextInputFormatter {
   @override
   TextEditingValue formatEditUpdate(
-      TextEditingValue oldValue, TextEditingValue newValue) {
-
-    // Permite al usuario borrar el campo
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
     if (newValue.text.isEmpty) {
       return newValue.copyWith(text: '');
     }
-
-    // Solo dígitos y un guion
     final text = newValue.text.replaceAll(RegExp(r'[^\d]'), '');
-
-    // Máximo 8 dígitos (ej. 1234567-8)
     if (text.length > 8) {
       return oldValue;
     }
-
-    // No formatear si solo hay 1 dígito
     if (text.length < 2) {
       return newValue;
     }
-
     final lastDigit = text.substring(text.length - 1);
     final firstPart = text.substring(0, text.length - 1);
-
     String newText = '$firstPart-$lastDigit';
 
     return newValue.copyWith(
@@ -118,25 +125,43 @@ class NrcInputFormatter extends TextInputFormatter {
     );
   }
 }
-// <<< --- FIN: NUEVO FORMATEADOR PARA NRC --- >>>
 
-
-// Formatter to allow only letters and spaces
-class LettersOnlyInputFormatter extends TextInputFormatter {
+// <<<--- INICIO: NUEVO FORMATEADOR PARA NOMBRES --- >>>
+// Permite letras, números, espacios y signos de puntuación comunes en nombres comerciales
+class NameInputFormatter extends TextInputFormatter {
   @override
   TextEditingValue formatEditUpdate(
-      TextEditingValue oldValue, TextEditingValue newValue) {
-    // Permite letras, espacios, y vocales acentuadas comunes + ñ/Ñ
-    final String filtered = newValue.text.replaceAll(RegExp(r'[^a-zA-Z\sáéíóúÁÉÍÓÚñÑ]'), '');
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    // Permite:
+    // - Letras (a-z, A-Z) y vocales acentuadas/ñ
+    // - Números (0-9)
+    // - Espacios (\s)
+    // - Signos de puntuación comunes: . , - _ & ( ) / " '
+    final String filtered = newValue.text.replaceAll(
+      RegExp(r'[^a-zA-Z0-9\sáéíóúÁÉÍÓÚñÑ.,\-_&()/"' + "']"),
+      '',
+    );
 
     int offset = newValue.selection.baseOffset;
-    if (newValue.text.length != filtered.length && offset > filtered.length) {
+    // Ajustar el cursor si se eliminaron caracteres
+    if (newValue.text.length != filtered.length) {
+      // Si la longitud cambió, intentamos mantener el cursor en una posición lógica,
+      // pero lo más seguro es ponerlo al final del texto filtrado si estaba más allá.
+      if (offset > filtered.length) {
+        offset = filtered.length;
+      }
+      // Una mejor aproximación si se borró algo en medio es reducir el offset
+      // por la cantidad de caracteres borrados antes del cursor.
+      // Por simplicidad, y porque suele funcionar bien para este caso:
       offset = filtered.length;
     }
 
-    return TextEditingValue(
+    return newValue.copyWith(
       text: filtered,
       selection: TextSelection.collapsed(offset: offset),
     );
   }
 }
+// <<<--- FIN: NUEVO FORMATEADOR PARA NOMBRES --- >>>
