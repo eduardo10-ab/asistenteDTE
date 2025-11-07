@@ -3,6 +3,8 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
+import 'package:cloud_functions/cloud_functions.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'models.dart';
 
 // --- LÍMITES DEMO ACTUALIZADOS ---
@@ -14,12 +16,24 @@ class StorageService {
   static const String _activationStatusKey = 'activationStatus';
   static const String _profilesKey = 'profiles';
   static const String _currentProfileKey = 'currentProfile';
-  // <<<--- INICIO: NUEVA CONSTANTE --- >>>
   static const String _lastInvoicedClientIdKey = 'lastInvoicedClientId';
-  // <<<--- FIN: NUEVA CONSTANTE --- >>>
+  static const String _deviceIdKey =
+      'device_unique_id'; // Nueva clave para el ID del dispositivo
+
   final _uuid = const Uuid();
 
-  // --- LÓGICA DE LICENCIA (Sin cambios) ---
+  // --- 1. Obtener ID Único del Dispositivo ---
+  Future<String> _getOrCreateDeviceId() async {
+    final prefs = await SharedPreferences.getInstance();
+    String? deviceId = prefs.getString(_deviceIdKey);
+    if (deviceId == null) {
+      deviceId = const Uuid().v4(); // Genera un nuevo ID único
+      await prefs.setString(_deviceIdKey, deviceId);
+    }
+    return deviceId;
+  }
+
+  // --- 2. LÓGICA DE LICENCIA (ACTUALIZADA A LA NUBE) ---
   Future<ActivationStatus> getActivationStatus() async {
     final prefs = await SharedPreferences.getInstance();
     final statusString = prefs.getString(_activationStatusKey);
@@ -35,24 +49,63 @@ class StorageService {
 
   Future<ActivationStatus> activateLicense(String userKey) async {
     final key = userKey.trim().toUpperCase();
-    ActivationStatus newStatus = ActivationStatus.none;
+
+    // 1. Chequeo rápido local para la DEMO genérica
     if (key == LicenseKeys.demoKey) {
-      // Usa la clave de models.dart
-      newStatus = ActivationStatus.demo;
-    } else if (LicenseKeys.proKeys.contains(key)) {
-      // Usa la lista de models.dart
-      newStatus = ActivationStatus.pro;
+      await _saveActivationLocally(ActivationStatus.demo);
+      return ActivationStatus.demo;
     }
-    // Solo guarda si la clave es válida (DEMO o PRO)
-    if (newStatus != ActivationStatus.none) {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_activationStatusKey, newStatus.name.toUpperCase());
+
+    // 2. Validación ROBUSTA en la nube para PRO
+    try {
+      final deviceId = await _getOrCreateDeviceId();
+      print("Intentando activar $key con deviceId: $deviceId");
+
+      // Llamada a tu Cloud Function 'validateLicense'
+      final HttpsCallable callable = FirebaseFunctions.instance.httpsCallable(
+        'validateLicense',
+      );
+
+      // <<<--- CAMBIO: Usamos un Map literal directamente --->>>
+      final result = await callable.call({'key': key, 'deviceId': deviceId});
+
+      final data = result.data as Map<dynamic, dynamic>;
+      final bool success = data['success'] == true;
+
+      if (success) {
+        // ¡El servidor dijo que SÍ!
+        final String tier = data['tier'] ?? 'DEMO';
+        ActivationStatus newStatus = (tier == 'PRO')
+            ? ActivationStatus.pro
+            : ActivationStatus.demo;
+
+        await _saveActivationLocally(newStatus);
+        return newStatus;
+      } else {
+        // El servidor dijo que NO. Lanzamos el error para que la UI lo muestre.
+        throw data['message'] ?? 'Error de activación desconocido.';
+      }
+    } on FirebaseFunctionsException catch (e) {
+      print('Error de Cloud Function: ${e.code} - ${e.message}');
+      // Si el error es 'invalid-argument', lo mostramos tal cual para depurar
+      if (e.code == 'invalid-argument') {
+        throw 'Error de validación: ${e.message}';
+      }
+      throw 'No se pudo conectar con el servidor de validación. Revisa tu conexión.';
+    } catch (e) {
+      print('Error general de activación: $e');
+      rethrow; // Reenviamos el error exacto (ej. "Clave ya usada")
     }
-    // Devuelve el estado encontrado (o 'none' si la clave no era válida)
-    return newStatus;
   }
 
-  // --- LÓGICA DE DATOS (Sin cambios) ---
+  Future<void> _saveActivationLocally(ActivationStatus status) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_activationStatusKey, status.name.toUpperCase());
+  }
+
+  // ==================================================================
+  // --- LÓGICA DE DATOS (SIN CAMBIOS DESDE AQUÍ HACIA ABAJO) ---
+  // ==================================================================
   Future<Map<String, Perfil>> _loadProfilesData() async {
     final prefs = await SharedPreferences.getInstance();
     String? profilesJson = prefs.getString(_profilesKey);
@@ -108,10 +161,8 @@ class StorageService {
   Future<void> switchProfile(String profileName) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_currentProfileKey, profileName);
-    // <<<--- INICIO: LIMPIAR CLIENTE RECIENTE AL CAMBIAR DE PERFIL --- >>>
-    // Esto asegura que el perfil nuevo no muestre el cliente reciente del perfil anterior
+    // Limpiar cliente reciente al cambiar de perfil
     await prefs.remove(_lastInvoicedClientIdKey);
-    // <<<--- FIN: LIMPIAR CLIENTE RECIENTE AL CAMBIAR DE PERFIL --- >>>
   }
 
   Future<Perfil> _getCurrentProfile() async {
@@ -141,7 +192,8 @@ class StorageService {
     return profile.products;
   }
 
-  // --- Funciones CRUD (Sin cambios) ---
+  // --- Funciones CRUD ---
+
   Future<void> saveCliente(Cliente cliente) async {
     final status = await getActivationStatus();
     if (status == ActivationStatus.none) {
@@ -291,7 +343,7 @@ class StorageService {
     await switchProfile(profiles.keys.first);
   }
 
-  // --- Funciones de Importar/Exportar (Sin cambios) ---
+  // --- Funciones de Importar/Exportar ---
   Future<String> exportData() async {
     final status = await getActivationStatus();
     if (status == ActivationStatus.none) {
@@ -337,17 +389,14 @@ class StorageService {
     }
   }
 
-  // <<<--- INICIO: NUEVOS MÉTODOS --- >>>
-  /// Guarda el ID del último cliente usado para facturar
+  // --- Nuevos métodos para cliente reciente ---
   Future<void> setLastInvoicedClientId(String clientId) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_lastInvoicedClientIdKey, clientId);
   }
 
-  /// Obtiene el ID del último cliente usado
   Future<String?> getLastInvoicedClientId() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString(_lastInvoicedClientIdKey);
   }
-  // <<<--- FIN: NUEVOS MÉTODOS --- >>>
 } // Fin StorageService

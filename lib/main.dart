@@ -1,9 +1,9 @@
 // lib/main.dart
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // Importación para SystemNavigator
+import 'package:flutter/services.dart';
 import 'package:webview_flutter/webview_flutter.dart';
-import 'dart:io'; // Para Platform
-import 'package:dio/dio.dart'; // Para descargas
+import 'dart:io';
+import 'package:dio/dio.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -11,9 +11,10 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:cross_file/cross_file.dart';
 import 'package:path_provider/path_provider.dart';
-import 'dart:convert'; // Para jsonDecode
-
-// import 'package:device_info_plus/device_info_plus.dart';
+import 'dart:convert';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:cloud_firestore/cloud_firestore.dart'; // <<<--- NUEVO IMPORT PARA SIEMBRA
+import 'firebase_options.dart';
 
 // --- Imports ---
 import 'clientes_perfiles_screen.dart';
@@ -23,20 +24,26 @@ import 'menu_flotante_widget.dart';
 import 'models.dart';
 import 'storage_service.dart';
 import 'js_injection.dart';
-import 'correo_screen.dart'; // <<<--- INICIO: NUEVA IMPORTACIÓN --- >>>
+import 'correo_screen.dart';
 
 // --- Colores ---
 const Color colorBlanco = Colors.white;
 const Color colorCelestePastel = Color(0xFF80D8FF);
-const Color colorAzulActivo = Color(
-  0xFF40C4FF,
-); // Este es un celeste más brillante
+const Color colorAzulActivo = Color(0xFF40C4FF);
 const Color colorGrisClaro = Color(0xFFF5F5F5);
 const Color colorTextoPrincipal = Color(0xFF424242);
 const Color colorTextoSecundario = Color(0xFF9E9E9E);
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  // <<<--- INICIO TEMPORAL: EJECUTAR UNA SOLA VEZ --- >>>
+  // Descomenta la siguiente línea, ejecuta la app, espera el mensaje de ÉXITO en la consola,
+  // y luego vuelve a comentar o borrar esta línea antes de subir a producción.
+  // await subirClavesMasivas();
+  // <<<--- FIN TEMPORAL --- >>>
+
   runApp(const MyApp());
 }
 
@@ -69,7 +76,7 @@ class MyApp extends StatelessWidget {
           iconTheme: IconThemeData(color: colorTextoPrincipal),
           titleTextStyle: TextStyle(
             color: colorTextoPrincipal,
-            fontSize: 24, // Tamaño de fuente del título de la AppBar
+            fontSize: 24,
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -198,10 +205,8 @@ class _MainScreenState extends State<MainScreen> {
       GlobalKey<_HomeScreenState>();
   final GlobalKey<ProductosScreenState> _productosScreenKey =
       GlobalKey<ProductosScreenState>();
-  // <<<--- INICIO: NUEVA GLOBAL KEY --- >>>
   final GlobalKey<CorreoScreenState> _correoScreenKey =
       GlobalKey<CorreoScreenState>();
-  // <<<--- FIN: NUEVA GLOBAL KEY --- >>>
 
   @override
   void initState() {
@@ -233,12 +238,7 @@ class _MainScreenState extends State<MainScreen> {
         },
         onStatusChangeNeeded: _reloadActivationStatus,
       ),
-      // <<<--- INICIO: CAMBIO EN PANTALLA DE CORREO --- >>>
-      CorreoScreen(
-        key: _correoScreenKey, // Asigna la key
-        currentStatus: _activationStatus,
-      ),
-      // <<<--- FIN: CAMBIO EN PANTALLA DE CORREO --- >>>
+      CorreoScreen(key: _correoScreenKey, currentStatus: _activationStatus),
       ClientesPerfilesScreen(currentStatus: _activationStatus),
       ProductosScreen(
         key: _productosScreenKey,
@@ -265,16 +265,12 @@ class _MainScreenState extends State<MainScreen> {
   void _onItemTapped(int index) {
     if (!mounted) return;
 
-    // <<<--- INICIO: NUEVA LÓGICA DE RECARGA --- >>>
-    // Recarga Correo si se toca la pestaña 1
     if (index == 1 && _selectedIndex != 1) {
       _correoScreenKey.currentState?.loadData();
     }
-    // Recarga Productos si se toca la pestaña 3
     if (index == 3 && _selectedIndex != 3) {
       _productosScreenKey.currentState?.loadData(_activationStatus);
     }
-    // <<<--- FIN: NUEVA LÓGICA DE RECARGA --- >>>
 
     setState(() {
       _selectedIndex = index;
@@ -372,19 +368,15 @@ class _MainScreenState extends State<MainScreen> {
       ),
     );
   }
-} // Fin _MainScreenState
+}
 
-//
-// El resto del archivo (HomeScreen, BlankPageWithNav, etc.)
-// no necesita cambios.
-//
-//--- HomeScreen (AHORA CONTIENE EL WEBVIEW) ---
+//--- HomeScreen ---
 class HomeScreen extends StatefulWidget {
   final ActivationStatus initialStatus;
   final Function(WebViewController) onWebViewRequested;
   final VoidCallback onStatusChangeNeeded;
   const HomeScreen({
-    super.key, // Pasamos la clave
+    super.key,
     required this.initialStatus,
     required this.onWebViewRequested,
     required this.onStatusChangeNeeded,
@@ -400,7 +392,6 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isActivating = false;
   final StorageService _storage = StorageService();
 
-  // --- LÓGICA DEL WEBVIEW MOVIDA AQUÍ ---
   WebViewController? _controller;
   bool _showWebView = false;
   bool _estaCargando = true;
@@ -509,12 +500,9 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  /// Parsea el JSON para encontrar el 'codigoGeneracion' y usarlo como nombre de archivo.
   String _getFilenameFromJson(String jsonContent, String fallbackName) {
     try {
       final decoded = jsonDecode(jsonContent) as Map<String, dynamic>;
-
-      // Intento 1: Llave "codigoGeneracion" anidada (más común en DTE)
       if (decoded.containsKey('identificacion') &&
           decoded['identificacion'] is Map) {
         final String? codigo =
@@ -523,14 +511,10 @@ class _HomeScreenState extends State<HomeScreen> {
           return '$codigo.json';
         }
       }
-
-      // Intento 2: Llave "codigoGeneracion" en la raíz
       final String? codigoRoot = decoded['codigoGeneracion']?.toString();
       if (codigoRoot != null && codigoRoot.isNotEmpty) {
         return '$codigoRoot.json';
       }
-
-      // Intento 3: Usar el fallback si es un nombre de archivo DTE válido (UUID)
       String cleanFallback = fallbackName.replaceAll('.json', '');
       if (cleanFallback.length == 36 && cleanFallback.contains('-')) {
         return '$cleanFallback.json';
@@ -553,21 +537,17 @@ class _HomeScreenState extends State<HomeScreen> {
         try {
           final data = jsonDecode(message.message) as Map<String, dynamic>;
 
-          // Caso 1: El interceptor mejorado (js_injection.dart)
           if (data['action'] == 'downloadDTE') {
-            print('Acción downloadDTE (interceptor JS) recibida.');
             if (data['processingStarted'] == true) {
               setState(() {
                 _estaCargando = true;
                 _isDownloading = false;
               });
             }
-
             if (data['data'] != null) {
               final jsonData = data['data'] as Map<String, dynamic>;
               final String jsonContent = jsonData['jsonContent'] ?? '';
               final String pdfUrl = jsonData['pdfUrl'] ?? '';
-
               if (jsonContent.isNotEmpty) {
                 final String fallbackName = jsonData['filename'] ?? 'dte.json';
                 final String finalFilename = _getFilenameFromJson(
@@ -581,12 +561,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 setState(() => _estaCargando = false);
               }
             }
-          }
-          // Caso 2: Nuestra nueva acción desde el lector de blob
-          else if (data['action'] == 'downloadFromBlob') {
-            print('Acción downloadFromBlob (lector de blob) recibida.');
+          } else if (data['action'] == 'downloadFromBlob') {
             final String jsonContent = data['jsonContent'] ?? '';
-
             if (jsonContent.isNotEmpty) {
               final String fallbackName =
                   data['filename'] ?? 'dte_from_blob.json';
@@ -599,16 +575,10 @@ class _HomeScreenState extends State<HomeScreen> {
               _showErrorSnackBar('Error: El blob JSON estaba vacío.');
             }
             _showMessage('JSON descargado. Se abrirá una ventana para el PDF.');
-          }
-          // Caso 3: Abrir ventana/enlace desde JS (window.open / target="_blank")
-          else if (data['action'] == 'openWindow') {
+          } else if (data['action'] == 'openWindow') {
             try {
               final String url = (data['url'] ?? '').toString();
-              if (url.isEmpty || url == 'about:blank') {
-                print('openWindow ignorado para URL vacía/about:blank');
-                return;
-              }
-
+              if (url.isEmpty || url == 'about:blank') return;
               final uri = Uri.parse(url);
               if (await canLaunchUrl(uri)) {
                 await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -616,20 +586,14 @@ class _HomeScreenState extends State<HomeScreen> {
                 _showErrorSnackBar('No se pudo abrir el enlace: $url');
               }
             } catch (e) {
-              print('Error abriendo ventana desde JS: $e');
               _showErrorSnackBar('Error al abrir enlace desde la página.');
             }
-          }
-          // Caso 4: PDF enviado como blob/base64 desde el injector JS
-          else if (data['action'] == 'pdfBlob') {
+          } else if (data['action'] == 'pdfBlob') {
             final now = DateTime.now();
             if (_lastPdfDownloadTime != null &&
-                now.difference(_lastPdfDownloadTime!) < _pdfCooldown) {
-              print('[pdfBlob] Cooldown: Ignorando descarga duplicada.');
+                now.difference(_lastPdfDownloadTime!) < _pdfCooldown)
               return;
-            }
             _lastPdfDownloadTime = now;
-
             try {
               final String base64Data = data['base64'] ?? '';
               final String originalFileName =
@@ -641,63 +605,50 @@ class _HomeScreenState extends State<HomeScreen> {
               final String timestamp = DateTime.now().millisecondsSinceEpoch
                   .toString();
               final String filename = '${timestamp}_$originalFileName';
-
               if (base64Data.isEmpty) {
                 _showErrorSnackBar('PDF vacío o no válido.');
                 return;
               }
               final bool hasPerm = await _requestStoragePermissions();
               if (!hasPerm) {
-                _showErrorSnackBar(
-                  'Permiso de almacenamiento necesario para guardar el PDF.',
-                );
+                _showErrorSnackBar('Permiso necesario para guardar el PDF.');
                 return;
               }
-
               Directory downloadsDir = Directory(
                 '/storage/emulated/0/Download',
               );
               if (!await downloadsDir.exists())
                 await downloadsDir.create(recursive: true);
               final String savePath = '${downloadsDir.path}/$filename';
-
               final bytes = base64Decode(base64Data);
               final file = File(savePath);
               await file.writeAsBytes(bytes, flush: true);
-              print('[pdfBlob] PDF guardado en: $savePath');
-
               try {
                 const platform = MethodChannel(
                   'com.facturacion.sv.app_factura/files',
                 );
                 await platform.invokeMethod('scanFile', {'path': savePath});
               } catch (e) {
-                print('Error solicitando scanFile al nativo (pdfBlob): $e');
+                print('Error solicitando scanFile: $e');
               }
               _showMessage('Archivo PDF guardado en Descargas: $filename');
               try {
                 final res = await OpenFilex.open(savePath);
-                print('OpenFilex result (pdfBlob): $res');
-                if (res.type != ResultType.done) {
+                if (res.type != ResultType.done)
                   throw Exception('No se pudo abrir el PDF');
-                }
               } catch (e) {
-                print('Error abriendo PDF con OpenFilex: $e');
                 _showErrorSnackBar('Error al abrir el PDF: ${e.toString()}');
               }
             } catch (e) {
-              print('Error procesando pdfBlob desde JS: $e');
               _showErrorSnackBar('Error al procesar PDF recibido.');
             }
           }
         } catch (e) {
-          print('Error procesando mensaje de JS: $e');
           _showErrorSnackBar('Error procesando datos de la página.');
         }
       },
     );
     await _controller!.setJavaScriptMode(JavaScriptMode.unrestricted);
-
     await _controller!.setNavigationDelegate(
       NavigationDelegate(
         onProgress: (int progress) {},
@@ -707,57 +658,39 @@ class _HomeScreenState extends State<HomeScreen> {
         onPageFinished: (String url) {
           if (mounted) setState(() => _estaCargando = false);
           _controller!.runJavaScript(jsInjector);
-          print("Interceptor JS y helpers inyectados en $url");
         },
         onWebResourceError: (WebResourceError error) {
           if (mounted) setState(() => _estaCargando = false);
-          print('Error al cargar recurso: ${error.description}');
-          _showErrorSnackBar(
-            'Error: ${error.description} (Code: ${error.errorCode})',
-          );
+          _showErrorSnackBar('Error al cargar recurso: ${error.description}');
         },
         onNavigationRequest: (NavigationRequest request) async {
           final String url = request.url;
-          print('NavReq: $url | Main frame: ${request.isMainFrame}');
-
-          // REGLA 1: Capturar descargas de archivos (PDF, etc.)
           if (url.endsWith('.pdf') ||
               url.endsWith('.zip') ||
               url.endsWith('.doc') ||
               url.endsWith('.docx') ||
               url.endsWith('.xls') ||
               url.endsWith('.xlsx')) {
-            print('Detectada descarga de archivo directo (fallback): $url');
             _handleFileDownload(url);
             return NavigationDecision.prevent;
           }
-
-          // REGLA 2: (Interceptar y leer BLOB - JSON)
           if (url.startsWith('blob:') && request.isMainFrame) {
-            print('Navegación a JSON/Blob detectada. PREVINIENDO y LEYENDO...');
-
             final String blobReadScript =
                 '''
         (async function() {
           try {
             const response = await fetch('$url');
             const contentType = (response.headers && response.headers.get) ? (response.headers.get('content-type') || '') : '';
-            // Si es PDF, leer como blob y enviar base64
             if (contentType.toLowerCase().includes('pdf')) {
               const blob = await response.blob();
               const reader = new FileReader();
               reader.onload = function() {
-                const dataUrl = reader.result; // data:application/pdf;base64,...
-                const base64 = (dataUrl && dataUrl.split(',')[1]) ? dataUrl.split(',')[1] : '';
+                const base64 = reader.result.split(',')[1];
                 window.FlutterChannel.postMessage(JSON.stringify({
                   action: 'pdfBlob',
                   base64: base64,
                   filename: 'dte_${DateTime.now().millisecondsSinceEpoch}.pdf'
                 }));
-              };
-              reader.onerror = function(e) {
-                console.error('Error leyendo blob como DataURL:', e);
-                window.FlutterChannel.postMessage(JSON.stringify({ action: 'downloadError', error: e && e.message }));
               };
               reader.readAsDataURL(blob);
             } else {
@@ -769,70 +702,34 @@ class _HomeScreenState extends State<HomeScreen> {
               }));
             }
           } catch (e) {
-            console.error('Error al leer el blob:', e);
-            window.FlutterChannel.postMessage(JSON.stringify({
-              action: 'downloadError',
-              error: e && e.message
-            }));
+            window.FlutterChannel.postMessage(JSON.stringify({ action: 'downloadError', error: e && e.message }));
           }
         })();
             ''';
-
             _controller?.runJavaScript(blobReadScript);
             _showMessage('Procesando JSON/PDF...');
             return NavigationDecision.prevent;
           }
-
-          // REGLA 3: (Lógica de about:blank y javascript:)
           if (url == 'about:blank' || url.startsWith('javascript:')) {
-            if (url == 'about:blank' && !request.isMainFrame) {
-              print('Permitiendo navegación de pop-up a: $url');
-              return NavigationDecision.navigate;
-            }
-            if (url == 'about:blank' && request.isMainFrame) {
-              print('Bloqueando navegación de frame principal a: $url');
+            if (url == 'about:blank' && request.isMainFrame)
               return NavigationDecision.prevent;
-            }
-            if (url.startsWith('javascript:')) {
-              print('Permitiendo navegación interna: $url');
-              return NavigationDecision.navigate;
-            }
+            return NavigationDecision.navigate;
           }
-
           final uri = Uri.parse(url);
           final String currentUrl = await _controller!.currentUrl() ?? '';
           final String currentHost = currentUrl.isNotEmpty
               ? Uri.parse(currentUrl).host
               : '';
-          final String requestHost = uri.host;
-
-          // REGLA 4: (Lógica de Pop-up a host externo)
-          if (!request.isMainFrame) {
-            bool isDifferentHost =
-                (uri.scheme == 'http' || uri.scheme == 'https') &&
-                currentHost.isNotEmpty &&
-                requestHost.isNotEmpty &&
-                requestHost != currentHost;
-
-            if (isDifferentHost) {
-              print(
-                'Detectado pop-up a host diferente ($url). Abriendo externamente.',
-              );
-              _showMessage('Abriendo enlace externo...');
-
-              if (await canLaunchUrl(uri)) {
-                await launchUrl(uri, mode: LaunchMode.externalApplication);
-              } else {
-                _showErrorSnackBar('No se pudo abrir enlace externo.');
-              }
-              return NavigationDecision.prevent;
+          if (!request.isMainFrame &&
+              uri.host.isNotEmpty &&
+              uri.host != currentHost) {
+            if (await canLaunchUrl(uri)) {
+              await launchUrl(uri, mode: LaunchMode.externalApplication);
+            } else {
+              _showErrorSnackBar('No se pudo abrir enlace externo.');
             }
+            return NavigationDecision.prevent;
           }
-
-          // REGLA 5: (Permitir el resto)
-          print(
-            'Navegación normal permitida (isMainFrame: ${request.isMainFrame}, host: $requestHost).',
-          );
           return NavigationDecision.navigate;
         },
       ),
@@ -845,7 +742,6 @@ class _HomeScreenState extends State<HomeScreen> {
         Uri.parse('https://admin.factura.gob.sv/login'),
       );
     } catch (e) {
-      print("Error cargando URL inicial: $e");
       _showErrorSnackBar("No se pudo cargar la página inicial.");
       if (mounted) setState(() => _estaCargando = false);
     }
@@ -859,67 +755,42 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // Función para guardar el contenido del JSON
   Future<void> _handleJsonDataDownload(
     String jsonContent,
-    String filename, // <-- AHORA RECIBE EL NOMBRE CORRECTO
+    String filename,
   ) async {
-    print('[_handleJsonDataDownload] Iniciando guardado de JSON: $filename');
     try {
       bool hasPermission = await _requestStoragePermissions();
-      if (!hasPermission) {
-        throw Exception('Permiso de almacenamiento denegado');
-      }
+      if (!hasPermission) throw Exception('Permiso denegado');
 
       if (Platform.isAndroid) {
+        Directory downloadsDir = Directory('/storage/emulated/0/Download');
+        if (!await downloadsDir.exists())
+          await downloadsDir.create(recursive: true);
+        final String savePath = '${downloadsDir.path}/$filename';
+        final File file = File(savePath);
+        await file.writeAsString(jsonContent, flush: true);
         try {
-          Directory? downloadsDir;
-          if (Platform.isAndroid) {
-            downloadsDir = Directory('/storage/emulated/0/Download');
-            if (!await downloadsDir.exists()) {
-              print('Intentando crear directorio de descargas');
-              await downloadsDir.create(recursive: true);
-            }
-          }
-
-          if (downloadsDir != null) {
-            final String savePath = '${downloadsDir.path}/$filename';
-            final File file = File(savePath);
-            await file.writeAsString(jsonContent, flush: true);
-            print('[_handleJsonDataDownload] JSON guardado en: $savePath');
-
-            try {
-              const platform = MethodChannel(
-                'com.facturacion.sv.app_factura/files',
-              );
-              await platform.invokeMethod('scanFile', {'path': savePath});
-            } catch (e) {
-              print('Error solicitando scanFile al nativo: $e');
-            }
-
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('JSON guardado: $filename'),
-                  duration: const Duration(seconds: 2),
-                ),
-              );
-            }
-          } else {
-            throw Exception('No se pudo acceder al directorio de descargas');
-          }
+          const platform = MethodChannel(
+            'com.facturacion.sv.app_factura/files',
+          );
+          await platform.invokeMethod('scanFile', {'path': savePath});
         } catch (e) {
-          print("Error guardando archivo: $e");
-          throw Exception('No se pudo guardar el archivo: $e');
+          print('Error solicitando scanFile: $e');
+        }
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('JSON guardado: $filename'),
+              duration: const Duration(seconds: 2),
+            ),
+          );
         }
       } else {
-        // Lógica para otros OS (iOS)
         final directory = await getApplicationDocumentsDirectory();
         final String savePath = '${directory.path}/$filename';
         final File file = File(savePath);
         await file.writeAsString(jsonContent, flush: true);
-        print('[_handleJsonDataDownload] JSON guardado en: $savePath');
-
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -930,39 +801,28 @@ class _HomeScreenState extends State<HomeScreen> {
         }
       }
     } catch (e) {
-      print("[_handleJsonDataDownload] *** ERROR AL GUARDAR JSON: $e");
       _showErrorSnackBar('Error al guardar archivo JSON: ${e.toString()}');
     }
   }
 
-  // Función para abrir PDF: (Sin cambios en esta sección)
   Future<void> _launchPdfUrl(String pdfUrl) async {
     final now = DateTime.now();
     if (_lastPdfDownloadTime != null &&
-        now.difference(_lastPdfDownloadTime!) < _pdfCooldown) {
-      print('[_launchPdfUrl] Cooldown: Ignorando descarga duplicada.');
+        now.difference(_lastPdfDownloadTime!) < _pdfCooldown)
       return;
-    }
     _lastPdfDownloadTime = now;
 
-    print("Intentando procesar PDF: $pdfUrl");
-
     String cleanUrl = pdfUrl.trim();
-    if (!cleanUrl.startsWith('http')) {
-      cleanUrl = 'https://$cleanUrl';
-    }
+    if (!cleanUrl.startsWith('http')) cleanUrl = 'https://$cleanUrl';
     final uri = Uri.parse(cleanUrl);
 
     try {
       final bool hasPerm = await _requestStoragePermissions();
-      if (!hasPerm) {
-        throw Exception('Permiso de almacenamiento denegado');
-      }
+      if (!hasPerm) throw Exception('Permiso denegado');
 
       Directory downloadsDir = Directory('/storage/emulated/0/Download');
-      if (!await downloadsDir.exists()) {
+      if (!await downloadsDir.exists())
         await downloadsDir.create(recursive: true);
-      }
 
       final String originalFileName = uri.pathSegments.isNotEmpty
           ? uri.pathSegments.last
@@ -972,7 +832,6 @@ class _HomeScreenState extends State<HomeScreen> {
           : 'documento.pdf';
       final String timestamp = DateTime.now().millisecondsSinceEpoch.toString();
       final String fileName = '${timestamp}_$originalFileName';
-
       final String savePath = '${downloadsDir.path}/$fileName';
 
       Dio dio = Dio();
@@ -993,22 +852,18 @@ class _HomeScreenState extends State<HomeScreen> {
         const platform = MethodChannel('com.facturacion.sv.app_factura/files');
         await platform.invokeMethod('scanFile', {'path': savePath});
       } catch (e) {
-        print('Error solicitando scanFile al nativo (pdf): $e');
+        print('Error solicitando scanFile: $e');
       }
 
       _showMessage('Archivo PDF guardado en Descargas: $fileName');
-
       final result = await OpenFilex.open(savePath);
-      print('OpenFilex result: $result');
       if (result.type != ResultType.done) {
         throw Exception(
           'OpenFilex no pudo abrir el archivo: ${result.message}',
         );
       }
     } catch (e) {
-      print('No fue posible descargar/abrir localmente el PDF: $e');
       _showErrorSnackBar('No se pudo abrir el PDF localmente: ${e.toString()}');
-
       try {
         if (await canLaunchUrl(uri)) {
           await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -1016,7 +871,6 @@ class _HomeScreenState extends State<HomeScreen> {
           await launchUrl(uri, mode: LaunchMode.inAppWebView);
         }
       } catch (e2) {
-        print('Error en fallback al abrir PDF: $e2');
         _showErrorSnackBar('No se pudo abrir el PDF de ninguna forma');
       }
     } finally {
@@ -1029,17 +883,12 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // Función para manejar la descarga de archivos genéricos (Sin cambios en esta sección)
   Future<void> _handleFileDownload(String url, {String? customFileName}) async {
     if (url.endsWith('.pdf') || (customFileName ?? '').endsWith('.pdf')) {
       final now = DateTime.now();
       if (_lastPdfDownloadTime != null &&
-          now.difference(_lastPdfDownloadTime!) < _pdfCooldown) {
-        print(
-          '[_handleFileDownload] Cooldown: Ignorando descarga duplicada de PDF.',
-        );
+          now.difference(_lastPdfDownloadTime!) < _pdfCooldown)
         return;
-      }
       _lastPdfDownloadTime = now;
     }
 
@@ -1071,15 +920,12 @@ class _HomeScreenState extends State<HomeScreen> {
       var status = await Permission.storage.status;
       if (!status.isGranted) {
         status = await Permission.storage.request();
-        if (!status.isGranted) {
-          throw Exception('Permiso de almacenamiento denegado');
-        }
+        if (!status.isGranted) throw Exception('Permiso denegado');
       }
 
       Directory downloadsDir = Directory('/storage/emulated/0/Download');
-      if (!await downloadsDir.exists()) {
+      if (!await downloadsDir.exists())
         await downloadsDir.create(recursive: true);
-      }
       final String savePath = '${downloadsDir.path}/$fileName';
 
       Dio dio = Dio();
@@ -1099,7 +945,7 @@ class _HomeScreenState extends State<HomeScreen> {
         const platform = MethodChannel('com.facturacion.sv.app_factura/files');
         await platform.invokeMethod('scanFile', {'path': savePath});
       } catch (e) {
-        print('Error solicitando scanFile al nativo (download): $e');
+        print('Error solicitando scanFile: $e');
       }
 
       if (mounted) {
@@ -1110,7 +956,6 @@ class _HomeScreenState extends State<HomeScreen> {
         }
       }
     } catch (e) {
-      print('Error en la descarga: $e');
       _showErrorSnackBar('Error al descargar el archivo: ${e.toString()}');
     } finally {
       if (mounted) {
@@ -1122,7 +967,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // --- Lógica de UI ---
   void _showError(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -1151,11 +995,7 @@ class _HomeScreenState extends State<HomeScreen> {
       final newStatus = await _storage.activateLicense(key);
       _activationKeyController.clear();
       widget.onStatusChangeNeeded();
-      if (mounted) {
-        setState(() {
-          _activationStatus = newStatus;
-        });
-      }
+      if (mounted) setState(() => _activationStatus = newStatus);
       if (newStatus == ActivationStatus.pro) {
         _showMessage('¡Aplicación activada a PRO!');
       } else if (newStatus == ActivationStatus.demo) {
@@ -1164,19 +1004,16 @@ class _HomeScreenState extends State<HomeScreen> {
         _showError('Clave de activación incorrecta.');
       }
     } catch (e) {
-      _showError('Error al activar: ${e.toString()}');
+      _showError(
+        e.toString(),
+      ); // Muestra el mensaje exacto de la Cloud Function
     } finally {
-      if (mounted) {
-        setState(() => _isActivating = false);
-      }
+      if (mounted) setState(() => _isActivating = false);
     }
   }
 
   Future<bool> handlePop() async {
-    if (!_showWebView) {
-      return false;
-    }
-
+    if (!_showWebView) return false;
     final canGoBack = await _controller?.canGoBack() ?? false;
     if (canGoBack) {
       _controller!.goBack();
@@ -1201,12 +1038,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
       );
-
-      if (shouldClose == true && mounted) {
-        setState(() {
-          _showWebView = false;
-        });
-      }
+      if (shouldClose == true && mounted) setState(() => _showWebView = false);
       return true;
     }
   }
@@ -1221,7 +1053,9 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: false,
-        title: Text(_showWebView ? 'Portal de Facturación' : 'Inicio'),
+        title: Text(
+          _showWebView ? 'Portal de Facturación' : 'Facturación electrónica',
+        ),
         actions: _showWebView
             ? [
                 IconButton(
@@ -1231,9 +1065,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 IconButton(
                   icon: const Icon(Icons.close),
                   tooltip: 'Cerrar portal',
-                  onPressed: () => setState(() {
-                    _showWebView = false;
-                  }),
+                  onPressed: () => setState(() => _showWebView = false),
                 ),
               ]
             : [
@@ -1271,9 +1103,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     );
                     widget.onStatusChangeNeeded();
                     final newStatus = await _storage.getActivationStatus();
-                    if (mounted && newStatus != _activationStatus) {
+                    if (mounted && newStatus != _activationStatus)
                       setState(() => _activationStatus = newStatus);
-                    }
                   },
                 ),
               ],
@@ -1290,8 +1121,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // --- Widgets Refactorizados ---
-
   Widget _buildGreetingUI(
     BuildContext context,
     ThemeData theme,
@@ -1300,20 +1129,14 @@ class _HomeScreenState extends State<HomeScreen> {
     return ListView(
       padding: const EdgeInsets.all(16.0),
       children: [
-        // <<<--- INICIO: CAMBIO DE ESPACIADO --- >>>
-        const SizedBox(
-          height: 16.0,
-        ), // Espacio extra agregado en la parte superior
+        const SizedBox(height: 16.0),
         _buildGreeting(),
         const SizedBox(height: 32),
-        // <<<--- FIN: CAMBIO DE ESPACIADO --- >>>
         _buildButtons(context),
-
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 24.0),
           child: Divider(color: Colors.grey[300], height: 1),
         ),
-
         if (_activationStatus != ActivationStatus.pro) ...[
           _buildActivationSection(),
           Padding(
@@ -1321,7 +1144,6 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Divider(color: Colors.grey[300], height: 1),
           ),
         ],
-
         _buildOverlaySection(context, overlayEnabled ? _toggleWebView : null),
         const SizedBox(height: 24),
         if (_activationStatus != ActivationStatus.pro) _buildProSection(),
@@ -1330,9 +1152,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildWebViewUI() {
-    if (_controller == null) {
+    if (_controller == null)
       return const Center(child: CircularProgressIndicator());
-    }
     return Stack(
       children: [
         WebViewWidget(controller: _controller!),
@@ -1353,6 +1174,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // Agrega esto dentro de _HomeScreenState
   void _toggleWebView() {
     if (_controller == null) {
       setState(() {
@@ -1387,14 +1209,12 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // <<<--- INICIO: CAMBIO DE TAMAÑO DE FUENTE --- >>>
   Widget _buildGreeting() {
     return const Text(
       'Bienvenido a tu asistente de facturación DTE',
-      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold), // Antes 24
+      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
     );
   }
-  // <<<--- FIN: CAMBIO DE TAMAÑO DE FUENTE --- >>>
 
   Widget _buildButtons(BuildContext context) {
     return Row(
@@ -1402,7 +1222,7 @@ class _HomeScreenState extends State<HomeScreen> {
         Expanded(
           child: ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: colorAzulActivo, // Color brillante
+              backgroundColor: colorAzulActivo,
               foregroundColor: colorBlanco,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
@@ -1432,7 +1252,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   child: const Icon(
                     Icons.double_arrow,
-                    color: colorAzulActivo, // Flechas color brillante
+                    color: colorAzulActivo,
                     size: 18,
                   ),
                 ),
@@ -1474,7 +1294,6 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(height: 6),
             TextField(
               controller: _activationKeyController,
-              keyboardType: TextInputType.visiblePassword,
               textCapitalization: TextCapitalization.characters,
               decoration: const InputDecoration(
                 hintText: 'XXXX-XXXX-XXXX-XXXX',
@@ -1525,19 +1344,16 @@ class _HomeScreenState extends State<HomeScreen> {
                   Image.asset(
                     'assets/images/cardPrincipal.png',
                     fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      print("Error cargando imagen: $error");
-                      return Container(
-                        height: 150,
-                        color: Colors.grey[200],
-                        alignment: Alignment.center,
-                        child: const Icon(
-                          Icons.broken_image,
-                          color: Colors.grey,
-                          size: 40,
-                        ),
-                      );
-                    },
+                    errorBuilder: (context, error, stackTrace) => Container(
+                      height: 150,
+                      color: Colors.grey[200],
+                      alignment: Alignment.center,
+                      child: const Icon(
+                        Icons.broken_image,
+                        color: Colors.grey,
+                        size: 40,
+                      ),
+                    ),
                   ),
                   Divider(height: 1, color: Colors.grey[300]),
                   Padding(
@@ -1581,9 +1397,9 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
-} // Fin _HomeScreenState
+}
 
-//--- BlankPageWithNav (Sin cambios) ---
+// --- BlankPageWithNav, _mostrarMenuFlotante y nueva función para siembra ---
 class BlankPageWithNav extends StatelessWidget {
   const BlankPageWithNav({super.key});
   @override
@@ -1622,7 +1438,6 @@ class BlankPageWithNav extends StatelessWidget {
   }
 }
 
-// --- FUNCIÓN GLOBAL _mostrarMenuFlotante (Sin cambios) ---
 void _mostrarMenuFlotante(
   BuildContext context,
   WebViewController? controller,
@@ -1633,8 +1448,84 @@ void _mostrarMenuFlotante(
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
     elevation: 0,
-    builder: (context) {
-      return MenuFlotanteWidget(webViewController: controller);
-    },
+    builder: (context) => MenuFlotanteWidget(webViewController: controller),
   );
+}
+
+// Función temporal para subir claves masivamente a Firestore.
+// USAR UNA SOLA VEZ Y LUEGO BORRAR O COMENTAR.
+Future<void> subirClavesMasivas() async {
+  print("Iniciando subida masiva de claves...");
+  final List<String> proKeys = [
+    "W7X4-9N3K-R8F2-L6A1",
+    "T5B3-E1H7-C4J2-G8V6",
+    "X3Z8-M6P4-Q2R9-Y7S5",
+    "F9G1-L7K3-H5B4-D2F8",
+    "V6C2-T8J5-E4A9-M1P7",
+    "K8R3-Y7S1-W4Z6-N2B9",
+    "Q2H5-D9V8-G1C4-J7T3",
+    "A1M7-P4E9-B2K6-R8L5",
+    "N6S2-F8G5-T1W9-C3H4",
+    "Y9K4-V6B8-D3K1-E7R2",
+    "L5A9-R2P7-M3N1-G8F4",
+    "H1D8-K4T2-W7S6-V3B9",
+    "B4G7-E3Q9-K2R5-F1L0",
+    "D8N2-T6W1-Y4S3-P9M5",
+    "M3V6-C9H2-S7A4-R1K8",
+    "Z5S1-G4J7-L9P3-W8N2",
+    "E9Q4-K8R1-F2D7-T3V6",
+    "R7B3-N6S9-A1M4-H5C2",
+    "W2T5-V8B1-J4G7-Y9E3",
+    "C6H9-L2K5-S8N1-P4M7",
+    "G1J8-D4N3-V7C6-T2B5",
+    "P4M2-A7R9-K1L6-S3H8",
+    "S8N5-E1Q3-B6G2-W7S4",
+    "Y3V7-T9W4-H2C1-R8K5",
+    "J6G0-F5D8-M1P9-N4S7",
+    "X1Z4-K7R2-T5B8-L9A3",
+    "H9C5-W3T1-S6N8-G4J3",
+    "R2L8-A4M1-P7E3-B9V7",
+    "T7B1-Y9V4-E2Q6-K5R3",
+    "N3S8-D6F2-C1H9-G7K4",
+    "A6N9-P1U7-L4K2-R8B5",
+    "F2D5-J8G1-W3T7-S9N4",
+    "K4R7-V1B3-H6C9-Q2E5",
+    "V8B2-S4N6-T1W5-M7P9",
+    "C3H6-G9J1-L7K4-R2B8",
+    "Q7E1-W5T9-Y2V3-A8M4",
+    "S1N9-R4K2-P8M6-J7G3",
+    "M5P3-B8V1-A6R9-H4C7",
+    "D9N6-K2Q1-S7N4-T8W3",
+    "G4J0-C7H1-B9V5-E3Q8",
+    "W1T8-A3M6-R9K4-L2B7",
+    "P7E9-S2N5-V4B1-J6G3",
+    "R3K6-B9V2-L4A8-C1H7",
+    "H8C4-G1J7-T5W3-N6S2",
+    "E2Q5-V7B9-M3P1-Y4R8",
+    "K9R1-D6F4-S2N8-A7M3",
+    "L4A7-H3C2-V6B1-T9W5",
+    "J8G3-T1W9-N5S4-F2D7",
+    "B2V6-M7P1-R9K3-E4Q8",
+    "Y2W9-E4Q1-P6M3-S8N7",
+  ];
+  final firestore = FirebaseFirestore.instance;
+  final batch = firestore.batch();
+  for (String key in proKeys) {
+    final docRef = firestore.collection('licenses').doc(key);
+    batch.set(docRef, {
+      'key': key,
+      'tier': 'PRO',
+      'isActive': true,
+      'deviceId': null,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+  }
+  try {
+    await batch.commit();
+    print(
+      "✅ ¡ÉXITO! ${proKeys.length} claves subidas correctamente a Firestore.",
+    );
+  } catch (e) {
+    print("❌ ERROR al subir claves: $e");
+  }
 }
