@@ -237,7 +237,7 @@ class _ClienteFormState extends State<ClienteForm> {
                     child: _buildTextFormField(
                       controller: _nrcCtrl,
                       label: 'NRC',
-                      keyboardType: TextInputType.text,
+                      keyboardType: TextInputType.number,
                       inputFormatters: [NrcInputFormatter()],
                     ),
                   ),

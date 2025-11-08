@@ -105,15 +105,18 @@ class NrcInputFormatter extends TextInputFormatter {
     TextEditingValue oldValue,
     TextEditingValue newValue,
   ) {
-    if (newValue.text.isEmpty) {
-      return newValue.copyWith(text: '');
-    }
+    // <<< FIX: Aseguramos que solo haya dígitos ANTES de aplicar el formato >>>
     final text = newValue.text.replaceAll(RegExp(r'[^\d]'), '');
+
     if (text.length > 8) {
       return oldValue;
     }
     if (text.length < 2) {
-      return newValue;
+      // Devolvemos el valor crudo, que ya sabemos que solo tiene dígitos
+      return newValue.copyWith(
+        text: text,
+        selection: TextSelection.collapsed(offset: text.length),
+      );
     }
     final lastDigit = text.substring(text.length - 1);
     final firstPart = text.substring(0, text.length - 1);
@@ -126,7 +129,6 @@ class NrcInputFormatter extends TextInputFormatter {
   }
 }
 
-// <<<--- INICIO: NUEVO FORMATEADOR PARA NOMBRES --- >>>
 // Permite letras, números, espacios y signos de puntuación comunes en nombres comerciales
 class NameInputFormatter extends TextInputFormatter {
   @override
@@ -145,16 +147,10 @@ class NameInputFormatter extends TextInputFormatter {
     );
 
     int offset = newValue.selection.baseOffset;
-    // Ajustar el cursor si se eliminaron caracteres
     if (newValue.text.length != filtered.length) {
-      // Si la longitud cambió, intentamos mantener el cursor en una posición lógica,
-      // pero lo más seguro es ponerlo al final del texto filtrado si estaba más allá.
       if (offset > filtered.length) {
         offset = filtered.length;
       }
-      // Una mejor aproximación si se borró algo en medio es reducir el offset
-      // por la cantidad de caracteres borrados antes del cursor.
-      // Por simplicidad, y porque suele funcionar bien para este caso:
       offset = filtered.length;
     }
 
@@ -164,4 +160,3 @@ class NameInputFormatter extends TextInputFormatter {
     );
   }
 }
-// <<<--- FIN: NUEVO FORMATEADOR PARA NOMBRES --- >>>
