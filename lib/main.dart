@@ -39,8 +39,6 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
-  // <<<--- CLAVES TEMPORALES ELIMINADAS --- >>>
-
   runApp(const MyApp());
 }
 
@@ -59,8 +57,7 @@ class MyApp extends StatelessWidget {
           secondary: colorAzulActivo,
           surface: colorBlanco,
           onSurface: colorTextoPrincipal,
-          surfaceContainerHighest:
-              colorGrisClaro, // FIX: Reemplazo de surfaceVariant
+          surfaceContainerHighest: colorGrisClaro,
           onSurfaceVariant: colorTextoPrincipal,
           onPrimary: colorTextoPrincipal,
           onSecondary: Colors.white,
@@ -81,6 +78,22 @@ class MyApp extends StatelessWidget {
         bottomAppBarTheme: const BottomAppBarThemeData(
           color: colorBlanco,
           elevation: 2,
+        ),
+        bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+          backgroundColor: colorBlanco,
+          elevation: 2,
+          selectedItemColor: colorAzulActivo,
+          unselectedItemColor: colorTextoSecundario,
+          selectedLabelStyle: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 12,
+          ),
+          unselectedLabelStyle: TextStyle(
+            fontWeight: FontWeight.normal,
+            fontSize: 12,
+          ),
+          type: BottomNavigationBarType.fixed,
+          showUnselectedLabels: true,
         ),
         floatingActionButtonTheme: const FloatingActionButtonThemeData(
           backgroundColor: colorAzulActivo,
@@ -318,7 +331,6 @@ class _MainScreenState extends State<MainScreen> {
         body: IndexedStack(index: _selectedIndex, children: _widgetOptions),
         floatingActionButton: FloatingActionButton(
           onPressed: () {
-            // <<< FIX: `use_build_context_synchronously` --- >>>
             if (!context.mounted) return;
             _mostrarMenuFlotante(
               context,
@@ -329,45 +341,16 @@ class _MainScreenState extends State<MainScreen> {
           child: const Icon(Icons.mode_edit, color: colorBlanco),
         ),
         floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
-        bottomNavigationBar: BottomAppBar(
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: <Widget>[
-              _buildNavItem(0, Icons.home, 'Inicio'),
-              _buildNavItem(1, Icons.mail, 'Correo'),
-              _buildNavItem(2, Icons.group, 'Clientes'),
-              _buildNavItem(3, Icons.add_shopping_cart, 'Productos'),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildNavItem(int index, IconData icon, String label) {
-    final isSelected = _selectedIndex == index;
-    final color = isSelected
-        ? Theme.of(context).colorScheme.secondary
-        : colorTextoSecundario;
-    return InkWell(
-      onTap: () => _onItemTapped(index),
-      borderRadius: BorderRadius.circular(4),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6.0, horizontal: 12.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: color, size: 24),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              style: TextStyle(
-                color: color,
-                fontSize: 12,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+        bottomNavigationBar: BottomNavigationBar(
+          currentIndex: _selectedIndex,
+          onTap: _onItemTapped,
+          items: const [
+            BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Inicio'),
+            BottomNavigationBarItem(icon: Icon(Icons.mail), label: 'Correo'),
+            BottomNavigationBarItem(icon: Icon(Icons.group), label: 'Clientes'),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.add_shopping_cart),
+              label: 'Productos',
             ),
           ],
         ),
@@ -441,7 +424,6 @@ class _HomeScreenState extends State<HomeScreen> {
           print('Notice: manageExternalStorage no disponible o fallo: $e');
         }
       }
-      // <<< FIX: `use_build_context_synchronously` --- >>>
       if (!mounted) return false;
       final bool? openSettings = await showDialog<bool>(
         context: context,
@@ -1194,8 +1176,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _controller!.goBack();
       return true;
     } else {
-      // <<< FIX: `use_build_context_synchronously` --- >>>
-      if (!mounted) return true; // Permite salir si ya no está montado
+      if (!mounted) return true;
       final bool? shouldClose = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
@@ -1232,9 +1213,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: false,
-        title: Text(
-          _showWebView ? 'Portal de Facturación' : 'Facturación electrónica',
-        ),
+        title: Text(_showWebView ? 'Portal de Facturación' : 'Inicio'),
         actions: _showWebView
             ? [
                 IconButton(
@@ -1256,7 +1235,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   child: Chip(
                     label: Text(
-                      _activationStatus.name.toUpperCase(),
+                      // <<<--- CAMBIO: Usando la nueva propiedad --- >>>
+                      _activationStatus.chipLabel,
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         color: _getStatusChipTextColor(_activationStatus),
@@ -1274,7 +1254,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   icon: const Icon(Icons.settings),
                   tooltip: 'Configuración',
                   onPressed: () async {
-                    // <<< FIX: `use_build_context_synchronously` --- >>>
                     if (!mounted) return;
                     await Navigator.push(
                       context,
@@ -1313,8 +1292,10 @@ class _HomeScreenState extends State<HomeScreen> {
       children: [
         const SizedBox(height: 16.0),
         _buildGreeting(),
-        const SizedBox(height: 32),
-        _buildButtons(context),
+        // <<<--- INICIO: BOTÓN DE TUTORIAL ELIMINADO --- >>>
+        // const SizedBox(height: 32),
+        // _buildButtons(context),
+        // <<<--- FIN: BOTÓN DE TUTORIAL ELIMINADO --- >>>
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 24.0),
           child: Divider(color: Colors.grey[300], height: 1),
@@ -1340,7 +1321,6 @@ class _HomeScreenState extends State<HomeScreen> {
     return Stack(
       children: [
         WebViewWidget(controller: _controller!),
-        // <<< FIX: Llaves {} eliminadas >>>
         if (_estaCargando) const Center(child: CircularProgressIndicator()),
         if (_isDownloading)
           Positioned(
@@ -1376,6 +1356,7 @@ class _HomeScreenState extends State<HomeScreen> {
         return Colors.green.shade50;
       case ActivationStatus.demo:
         return Colors.orange.shade50;
+      case ActivationStatus.none:
       default:
         return Colors.grey.shade200;
     }
@@ -1387,6 +1368,7 @@ class _HomeScreenState extends State<HomeScreen> {
         return Colors.green.shade800;
       case ActivationStatus.demo:
         return Colors.orange.shade800;
+      case ActivationStatus.none:
       default:
         return Colors.grey.shade700;
     }
@@ -1399,53 +1381,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildButtons(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: colorAzulActivo,
-              foregroundColor: colorBlanco,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 20),
-            ),
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const BlankPageWithNav()),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Tutorial',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 16,
-                    color: colorBlanco,
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.all(6.0),
-                  decoration: BoxDecoration(
-                    color: colorBlanco,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Icon(
-                    Icons.double_arrow,
-                    color: colorAzulActivo,
-                    size: 18,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
+  // <<<--- MÉTODO _buildButtons ELIMINADO --- >>>
 
   Widget _buildActivationSection() {
     final theme = Theme.of(context);
@@ -1461,12 +1397,25 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 16),
             Text(
-              'Estado actual: ${_activationStatus.name.toUpperCase()}',
+              // <<<--- CAMBIO: Usando la nueva propiedad --- >>>
+              'Estado actual: ${_activationStatus.chipLabel}',
               style: theme.textTheme.bodyMedium?.copyWith(
                 fontSize: 16,
-                color: _activationStatus == ActivationStatus.demo
-                    ? Colors.orange[800]
-                    : theme.textTheme.bodyMedium?.color,
+                color: _activationStatus.color,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Para la activación de todas las funcionalidades por favor contactarnos al: ',
+              style: theme.textTheme.bodyLarge?.copyWith(
+                color: theme.disabledColor,
+              ),
+            ),
+            Text(
+              '7727-8551 o 7722-0472',
+              style: theme.textTheme.bodyLarge?.copyWith(
+                color: theme.disabledColor,
+                fontWeight: FontWeight.bold,
               ),
             ),
             const SizedBox(height: 16),
@@ -1562,7 +1511,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
         ),
-        // <<< FIX: Llaves {} eliminadas >>>
         if (!isEnabled)
           Padding(
             padding: const EdgeInsets.only(top: 8.0),
@@ -1588,47 +1536,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-// --- BlankPageWithNav, _mostrarMenuFlotante ---
-class BlankPageWithNav extends StatelessWidget {
-  const BlankPageWithNav({super.key});
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(''),
-        elevation: 0,
-        backgroundColor: Colors.white,
-      ),
-      body: const Center(child: Text('Página en blanco')),
-      bottomNavigationBar: BottomNavigationBar(
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Inicio'),
-          BottomNavigationBarItem(icon: Icon(Icons.mail), label: 'Correo'),
-          BottomNavigationBarItem(icon: Icon(Icons.people), label: 'Clientes'),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.add_shopping_cart),
-            label: 'Productos',
-          ),
-        ],
-        currentIndex: 0,
-        selectedItemColor: Colors.blue,
-        unselectedItemColor: Colors.grey,
-        onTap: (index) => Navigator.pop(context),
-        type: BottomNavigationBarType.fixed,
-        showUnselectedLabels: true,
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          // <<< FIX: `use_build_context_synchronously` --- >>>
-          if (!context.mounted) return;
-          _mostrarMenuFlotante(context, null, () {});
-        },
-        child: const Icon(Icons.edit),
-      ),
-    );
-  }
-}
+// <<<--- CLASE BlankPageWithNav ELIMINADA --- >>>
 
+// --- FUNCIÓN GLOBAL _mostrarMenuFlotante ---
 void _mostrarMenuFlotante(
   BuildContext context,
   WebViewController? controller,
@@ -1642,5 +1552,3 @@ void _mostrarMenuFlotante(
     builder: (context) => MenuFlotanteWidget(webViewController: controller),
   );
 }
-
-// <<<--- FUNCIÓN DE SIEMBRA ELIMINADA --- >>>

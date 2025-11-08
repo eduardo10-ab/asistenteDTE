@@ -112,8 +112,8 @@ flutter:
 flutter_launcher_icons:
   android: "launcher_icon" # Esto creará un icono adaptable para Android
   ios: true
-  image_path: "assets/images/app_icon_base.png" # Ruta a tu icono generado
+  image_path: "assets/images/appIcon.png" # Ruta a tu icono generado
   min_sdk_android: 21 # o la versión mínima que soporta tu app
   remove_alpha_ios: true # Recomendado para iOS para evitar fondo transparente
   adaptive_icon_background: "#40C4FF" # ColorAzulActivo en hexadecimal
-  adaptive_icon_foreground: "assets/images/app_icon_base.png" # Mismo icono, para el foreground adaptable
+  adaptive_icon_foreground: "assets/images/appIcon.png" # Mismo icono, para el foreground adaptable

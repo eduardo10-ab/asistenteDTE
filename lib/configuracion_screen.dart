@@ -128,13 +128,20 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
                               ),
                               const SizedBox(height: 16),
                               Text(
-                                'Reporte de errores de la aplicaion por favor contactarse al correo:',
+                                'Reporte de errores de la aplicaion por favor contactarnos:',
                                 style: theme.textTheme.bodyLarge?.copyWith(
                                   color: theme.disabledColor,
                                 ),
                               ),
                               Text(
-                                'soportetecnico@gmail.com',
+                                'fuentesjoel723@gmail.com',
+                                style: theme.textTheme.bodyLarge?.copyWith(
+                                  color: theme.disabledColor,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              Text(
+                                'david.galvito2000@gmail.com',
                                 style: theme.textTheme.bodyLarge?.copyWith(
                                   color: theme.disabledColor,
                                   fontWeight: FontWeight.bold,

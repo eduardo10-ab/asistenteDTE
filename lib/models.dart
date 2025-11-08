@@ -1,10 +1,9 @@
 // lib/models.dart
 
-// import 'dart:convert'; // <<< FIX: Eliminado (no se usa)
 import 'package:flutter/material.dart';
 import 'main.dart';
 
-// --- CLASES DE LICENCIA (Portado de options.js) ---
+// --- CLASES DE LICENCIA ---
 class LicenseKeys {
   static const String demoKey = "DEMO-2025";
 }
@@ -14,6 +13,20 @@ enum ActivationStatus {
   demo,
   pro;
 
+  // <<<--- INICIO: NUEVA PROPIEDAD PARA LA CÁPSULA --- >>>
+  String get chipLabel {
+    switch (this) {
+      case ActivationStatus.pro:
+        return 'PRO';
+      case ActivationStatus.demo:
+        return 'DEMO';
+      case ActivationStatus.none:
+      default:
+        return 'INACTIVO'; // Aquí está el cambio
+    }
+  }
+  // <<<--- FIN: NUEVA PROPIEDAD --- >>>
+
   String get displayName {
     switch (this) {
       case ActivationStatus.pro:
@@ -21,7 +34,6 @@ enum ActivationStatus {
       case ActivationStatus.demo:
         return 'Versión limitada';
       case ActivationStatus.none:
-        // <<< FIX: `unreachable_switch_default` (eliminado 'default') >>>
         return 'Sin activación';
     }
   }
@@ -33,7 +45,7 @@ enum ActivationStatus {
       case ActivationStatus.demo:
         return 'Versión limitada: Funcionalidades limitadas.';
       case ActivationStatus.none:
-        // <<< FIX: `unreachable_switch_default` (eliminado 'default') >>>
+      default:
         return 'La aplicación no está activada. Introduce la clave en la pantalla de Inicio.';
     }
   }
@@ -45,8 +57,8 @@ enum ActivationStatus {
       case ActivationStatus.demo:
         return Colors.orange[800] ?? Colors.orange;
       case ActivationStatus.none:
-        // <<< FIX: `unreachable_switch_default` (eliminado 'default') >>>
-        return colorTextoSecundario; // Asegúrate de que colorTextoSecundario esté definido o usa Colors.grey
+      default:
+        return colorTextoSecundario;
     }
   }
 }
