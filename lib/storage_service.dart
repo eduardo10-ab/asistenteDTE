@@ -1,10 +1,11 @@
 // lib/storage_service.dart
 
 import 'dart:convert';
+import 'package:flutter/foundation.dart'; // <<<--- AÑADIDO PARA kDebugMode
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import 'package:cloud_functions/cloud_functions.dart';
-import 'package:firebase_core/firebase_core.dart';
+// import 'package:firebase_core/firebase_core.dart'; // <<<--- ELIMINADO (no usado)
 import 'models.dart';
 
 // --- LÍMITES DEMO ACTUALIZADOS ---
@@ -59,14 +60,16 @@ class StorageService {
     // 2. Validación ROBUSTA en la nube para PRO
     try {
       final deviceId = await _getOrCreateDeviceId();
-      print("Intentando activar $key con deviceId: $deviceId");
+      // <<< FIX: `print` reemplazado por `kDebugMode` >>>
+      if (kDebugMode) {
+        print("Intentando activar $key con deviceId: $deviceId");
+      }
 
       // Llamada a tu Cloud Function 'validateLicense'
       final HttpsCallable callable = FirebaseFunctions.instance.httpsCallable(
         'validateLicense',
       );
 
-      // <<<--- CAMBIO: Usamos un Map literal directamente --->>>
       final result = await callable.call({'key': key, 'deviceId': deviceId});
 
       final data = result.data as Map<dynamic, dynamic>;
@@ -86,14 +89,20 @@ class StorageService {
         throw data['message'] ?? 'Error de activación desconocido.';
       }
     } on FirebaseFunctionsException catch (e) {
-      print('Error de Cloud Function: ${e.code} - ${e.message}');
+      // <<< FIX: `print` reemplazado por `kDebugMode` >>>
+      if (kDebugMode) {
+        print('Error de Cloud Function: ${e.code} - ${e.message}');
+      }
       // Si el error es 'invalid-argument', lo mostramos tal cual para depurar
       if (e.code == 'invalid-argument') {
         throw 'Error de validación: ${e.message}';
       }
       throw 'No se pudo conectar con el servidor de validación. Revisa tu conexión.';
     } catch (e) {
-      print('Error general de activación: $e');
+      // <<< FIX: `print` reemplazado por `kDebugMode` >>>
+      if (kDebugMode) {
+        print('Error general de activación: $e');
+      }
       rethrow; // Reenviamos el error exacto (ej. "Clave ya usada")
     }
   }
@@ -122,9 +131,12 @@ class StorageService {
               MapEntry(key, Perfil.fromJson(value as Map<String, dynamic>)),
         );
       } catch (e) {
-        print(
-          "Error decodificando perfiles: $e. Creando perfil predeterminado.",
-        );
+        // <<< FIX: `print` reemplazado por `kDebugMode` >>>
+        if (kDebugMode) {
+          print(
+            "Error decodificando perfiles: $e. Creando perfil predeterminado.",
+          );
+        }
         profilesMap = {'Perfil Predeterminado': Perfil.empty()};
         await _saveProfilesData(profilesMap);
         await switchProfile('Perfil Predeterminado');
@@ -349,7 +361,10 @@ class StorageService {
     if (status == ActivationStatus.none) {
       throw ('Necesitas activar la aplicación (DEMO o PRO) para exportar datos.');
     }
-    print("Exportar datos...");
+    // <<< FIX: `print` reemplazado por `kDebugMode` >>>
+    if (kDebugMode) {
+      print("Exportar datos...");
+    }
     final profiles = await _loadProfilesData();
     final currentProfile = await getCurrentProfileName();
     final data = {
@@ -364,7 +379,10 @@ class StorageService {
     if (status == ActivationStatus.none) {
       throw ('Necesitas activar la aplicación (DEMO o PRO) para importar datos.');
     }
-    print("Importar datos...");
+    // <<< FIX: `print` reemplazado por `kDebugMode` >>>
+    if (kDebugMode) {
+      print("Importar datos...");
+    }
     try {
       final data = jsonDecode(jsonString) as Map<String, dynamic>;
       if (data.containsKey('profiles') && data.containsKey('currentProfile')) {
@@ -384,7 +402,10 @@ class StorageService {
         throw ('El archivo no tiene el formato correcto (faltan claves principales).');
       }
     } catch (e) {
-      print("Error detallado al importar: $e");
+      // <<< FIX: `print` reemplazado por `kDebugMode` >>>
+      if (kDebugMode) {
+        print("Error detallado al importar: $e");
+      }
       throw ('Error al leer o validar el archivo JSON. Asegúrate de que el formato sea correcto.');
     }
   }

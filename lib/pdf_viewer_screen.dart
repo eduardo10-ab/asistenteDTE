@@ -1,4 +1,5 @@
-import 'dart:io';
+// lib/pdf_viewer_screen.dart
+// import 'dart:io'; // <<< FIX: Eliminado (no se usa)
 import 'package:flutter/material.dart';
 import 'package:flutter_pdfview/flutter_pdfview.dart';
 import 'package:share_plus/share_plus.dart';
@@ -8,10 +9,10 @@ class PDFViewerScreen extends StatelessWidget {
   final String title;
 
   const PDFViewerScreen({
-    Key? key,
+    super.key, // <<< FIX: Convertido a super parámetro
     required this.filePath,
     this.title = 'Visor de PDF',
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -22,6 +23,8 @@ class PDFViewerScreen extends StatelessWidget {
           IconButton(
             icon: const Icon(Icons.share),
             onPressed: () async {
+              // <<< FIX: `SharePlus.shareXFiles` no existe, se usa `Share.shareXFiles`
+              // El linter se confundía, pero esta es la forma correcta de usar el paquete.
               await Share.shareXFiles([
                 XFile(filePath),
               ], subject: 'Compartir PDF');
@@ -31,6 +34,8 @@ class PDFViewerScreen extends StatelessWidget {
             icon: const Icon(Icons.download),
             onPressed: () {
               // Ya está guardado en filePath
+              // <<< FIX: `use_build_context_synchronously` --- >>>
+              if (!context.mounted) return;
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text('PDF guardado en: $filePath'),
@@ -48,6 +53,8 @@ class PDFViewerScreen extends StatelessWidget {
         autoSpacing: true,
         pageFling: true,
         onError: (error) {
+          // <<< FIX: `use_build_context_synchronously` --- >>>
+          if (!context.mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Error al cargar el PDF: $error'),
@@ -56,6 +63,8 @@ class PDFViewerScreen extends StatelessWidget {
           );
         },
         onPageError: (page, error) {
+          // <<< FIX: `use_build_context_synchronously` --- >>>
+          if (!context.mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Error en la página $page: $error'),

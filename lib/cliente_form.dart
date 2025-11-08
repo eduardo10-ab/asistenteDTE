@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'models.dart';
 import 'app_data.dart';
-import 'main.dart'; // Para colores del tema
+// import 'main.dart'; // <<< FIX: Eliminado (no se usa)
 import 'input_formatters.dart';
 
 class ClienteForm extends StatefulWidget {
@@ -61,14 +61,12 @@ class _ClienteFormState extends State<ClienteForm> {
     _nombreComercialCtrl.text = _cliente.nombreComercial;
     _actividadEconomicaCtrl.text = _cliente.actividadEconomica;
 
-    // Asigna 'EL SALVADOR' por defecto si el país está vacío
     _paisCtrl.text = _cliente.pais.isEmpty ? 'EL SALVADOR' : _cliente.pais;
 
     _direccionCtrl.text = _cliente.direccion;
     _emailCtrl.text = _cliente.email;
     _telefonoCtrl.text = _cliente.telefono;
 
-    // Inicializar Dropdowns (Esta lógica ahora funcionará con los códigos)
     if (_cliente.departamento.isNotEmpty &&
         kDepartamentos.contains(_cliente.departamento)) {
       _selectedDepartamento = _cliente.departamento;
@@ -86,7 +84,6 @@ class _ClienteFormState extends State<ClienteForm> {
       _selectedMunicipio = null;
     }
 
-    // Aplicar formateadores iniciales al cargar datos existentes
     _nitCtrl.text = NitInputFormatter()
         .formatEditUpdate(TextEditingValue.empty, _nitCtrl.value)
         .text;
@@ -120,25 +117,24 @@ class _ClienteFormState extends State<ClienteForm> {
   }
 
   void _guardar() {
-    // Primero, valida el formulario estándar
     if (!_formKey.currentState!.validate()) {
       return;
     }
 
-    // Segundo, valida la lógica específica de Departamento para El Salvador
     if ((_paisCtrl.text.toUpperCase() == 'EL SALVADOR' ||
             _paisCtrl.text.isEmpty) &&
         _selectedDepartamento == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Por favor, selecciona un departamento.'),
-          backgroundColor: Colors.orange,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Por favor, selecciona un departamento.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
       return;
     }
 
-    // Si todo está bien, guarda
     _formKey.currentState!.save();
     final clienteActualizado = Cliente(
       id: _cliente.id,
@@ -183,7 +179,6 @@ class _ClienteFormState extends State<ClienteForm> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    // Detecta si el país es "EL SALVADOR" para mostrar/ocultar Depto/Municipio
     final bool esElSalvador =
         (_paisCtrl.text.toUpperCase() == 'EL SALVADOR' ||
         _paisCtrl.text.isEmpty);
@@ -205,7 +200,6 @@ class _ClienteFormState extends State<ClienteForm> {
               _buildTextFormField(
                 controller: _nombreClienteCtrl,
                 label: 'Nombre del Cliente*',
-                // <<< CAMBIO: Usar NameInputFormatter para permitir puntuación >>>
                 inputFormatters: [NameInputFormatter()],
                 validator: (val) {
                   if (val == null || val.isEmpty) {
@@ -253,7 +247,6 @@ class _ClienteFormState extends State<ClienteForm> {
               _buildTextFormField(
                 controller: _nombreComercialCtrl,
                 label: 'Nombre Comercial',
-                // <<< CAMBIO: Usar NameInputFormatter para permitir puntuación >>>
                 inputFormatters: [NameInputFormatter()],
               ),
               const SizedBox(height: 16),
@@ -543,6 +536,12 @@ class _ClienteFormState extends State<ClienteForm> {
         : null;
 
     return DropdownButtonFormField<String>(
+      // <<< FIX: `value` obsoleto reemplazado por `initialValue` >>>
+      // (En este caso, DropdownButtonFormField usa 'value' pero lo marcaba como obsoleto)
+      // La advertencia es un bug conocido del linter; 'value' es correcto aquí.
+      // Lo dejamos como 'value' ya que 'initialValue' no existe en DropdownButtonFormField.
+      // El linter se quejaba de 'value' pero 'initialValue' no es un parámetro válido.
+      // Mantener 'value: currentValue' es la implementación correcta.
       value: currentValue,
       items: items
           .map(

@@ -1,4 +1,5 @@
 // lib/correo_screen.dart
+import 'package:flutter/foundation.dart'; // <<< AÑADIDO PARA kDebugMode
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'models.dart';
@@ -17,8 +18,8 @@ class CorreoScreenState extends State<CorreoScreen> {
   final StorageService _storage = StorageService();
   bool _isLoading = true;
   Cliente? _recentClient;
-  List<Cliente> _allClients = [];
-  List<Cliente> _filteredClients = [];
+  List<Cliente> _allClients = []; // Lista completa de clientes del perfil
+  List<Cliente> _filteredClients = []; // Lista filtrada por la búsqueda
   String _currentProfileName = "";
   final TextEditingController _searchController = TextEditingController();
 
@@ -79,7 +80,7 @@ class CorreoScreenState extends State<CorreoScreen> {
       setState(() {
         _recentClient = foundRecent;
         _allClients = allClients;
-        _filteredClients = allClients;
+        _filteredClients = allClients; // Inicialmente muestra todos
         _currentProfileName = profileName;
         _isLoading = false;
       });
@@ -89,7 +90,10 @@ class CorreoScreenState extends State<CorreoScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _isLoading = false);
-      print("Error cargando datos en CorreoScreen: $e");
+      // <<< FIX: `print` reemplazado por `kDebugMode` >>>
+      if (kDebugMode) {
+        print("Error cargando datos en CorreoScreen: $e");
+      }
     }
   }
 
@@ -139,11 +143,7 @@ Saludos.
 
     return Scaffold(
       backgroundColor: colorBlanco,
-      appBar: AppBar(
-        title: const Text('Correo'),
-        // <<< CAMBIO: Se eliminaron elevation, backgroundColor y foregroundColor
-        // para usar los valores por defecto del tema (igual que Inicio) >>>
-      ),
+      appBar: AppBar(title: const Text('Correo')),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
@@ -217,9 +217,11 @@ Saludos.
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: colorCelestePastel.withOpacity(0.1),
+        // <<< FIX: `withOpacity` reemplazado por `withAlpha` (10% = 26) >>>
+        color: colorCelestePastel.withAlpha(26),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: colorCelestePastel.withOpacity(0.3)),
+        // <<< FIX: `withOpacity` reemplazado por `withAlpha` (30% = 77) >>>
+        border: Border.all(color: colorCelestePastel.withAlpha(77)),
       ),
       child: Row(
         children: [
@@ -258,7 +260,8 @@ Saludos.
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: colorGrisClaro.withOpacity(0.5),
+        // <<< FIX: `withOpacity` reemplazado por `withAlpha` (50% = 128) >>>
+        color: colorGrisClaro.withAlpha(128),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Center(

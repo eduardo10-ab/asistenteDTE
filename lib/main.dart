@@ -8,13 +8,14 @@ import 'package:open_filex/open_filex.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:share_plus/share_plus.dart';
-import 'package:cross_file/cross_file.dart';
+// import 'package:share_plus/share_plus.dart'; // No usado
+// import 'package:cross_file/cross_file.dart'; // No usado
 import 'package:path_provider/path_provider.dart';
 import 'dart:convert';
 import 'package:firebase_core/firebase_core.dart';
-// import 'package:cloud_firestore/cloud_firestore.dart'; // <<<--- ELIMINADO
+// import 'package:cloud_firestore/cloud_firestore.dart'; // No usado aquí
 import 'firebase_options.dart';
+import 'package:flutter/foundation.dart'; // Para kDebugMode
 
 // --- Imports ---
 import 'clientes_perfiles_screen.dart';
@@ -38,8 +39,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
-  // <<<--- LÍNEA DE SIEMBRA (ELIMINADA) --- >>>
-  // await subirClavesMasivas();
+  // <<<--- CLAVES TEMPORALES ELIMINADAS --- >>>
 
   runApp(const MyApp());
 }
@@ -59,7 +59,8 @@ class MyApp extends StatelessWidget {
           secondary: colorAzulActivo,
           surface: colorBlanco,
           onSurface: colorTextoPrincipal,
-          surfaceVariant: colorGrisClaro,
+          surfaceContainerHighest:
+              colorGrisClaro, // FIX: Reemplazo de surfaceVariant
           onSurfaceVariant: colorTextoPrincipal,
           onPrimary: colorTextoPrincipal,
           onSecondary: Colors.white,
@@ -245,17 +246,23 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   Future<void> _reloadActivationStatus() async {
-    print("Recargando estado...");
+    if (kDebugMode) {
+      print("Recargando estado...");
+    }
     final status = await _storage.getActivationStatus();
     if (!mounted) return;
     if (status != _activationStatus) {
-      print("¡Estado cambió a $status!");
+      if (kDebugMode) {
+        print("¡Estado cambió a $status!");
+      }
       setState(() {
         _activationStatus = status;
         _buildScreens();
       });
     } else {
-      print("Estado no cambió.");
+      if (kDebugMode) {
+        print("Estado no cambió.");
+      }
     }
   }
 
@@ -311,6 +318,8 @@ class _MainScreenState extends State<MainScreen> {
         body: IndexedStack(index: _selectedIndex, children: _widgetOptions),
         floatingActionButton: FloatingActionButton(
           onPressed: () {
+            // <<< FIX: `use_build_context_synchronously` --- >>>
+            if (!context.mounted) return;
             _mostrarMenuFlotante(
               context,
               _webViewController,
@@ -399,55 +408,74 @@ class _HomeScreenState extends State<HomeScreen> {
   final Duration _pdfCooldown = const Duration(seconds: 5);
 
   Future<bool> _requestStoragePermissions() async {
-    print('Solicitando permisos de almacenamiento...');
+    if (kDebugMode) {
+      print('Solicitando permisos de almacenamiento...');
+    }
 
     if (Platform.isAndroid) {
       try {
         var storageStatus = await Permission.storage.status;
-        if (storageStatus.isGranted) return true;
+        if (storageStatus.isGranted) {
+          return true;
+        }
         final storageRequest = await Permission.storage.request();
-        if (storageRequest.isGranted) return true;
+        if (storageRequest.isGranted) {
+          return true;
+        }
       } catch (e) {
-        print('Warning: error comprobando Permission.storage: $e');
+        if (kDebugMode) {
+          print('Warning: error comprobando Permission.storage: $e');
+        }
       }
       try {
         var manageStatus = await Permission.manageExternalStorage.status;
-        if (manageStatus.isGranted) return true;
+        if (manageStatus.isGranted) {
+          return true;
+        }
         final manageRequest = await Permission.manageExternalStorage.request();
-        if (manageRequest.isGranted) return true;
+        if (manageRequest.isGranted) {
+          return true;
+        }
       } catch (e) {
-        print('Notice: manageExternalStorage no disponible o fallo: $e');
+        if (kDebugMode) {
+          print('Notice: manageExternalStorage no disponible o fallo: $e');
+        }
       }
-      if (mounted) {
-        final bool? openSettings = await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Permiso necesario'),
-            content: const Text(
-              'La aplicación necesita permiso para guardar archivos (JSON/PDF) en tu dispositivo. '
-              'Si no permites el acceso, se guardará una copia en la carpeta interna de la app, '
-              'pero no estará en la carpeta Descargas. ¿Deseas abrir la configuración ahora?',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('No'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text('Abrir configuración'),
-              ),
-            ],
+      // <<< FIX: `use_build_context_synchronously` --- >>>
+      if (!mounted) return false;
+      final bool? openSettings = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Permiso necesario'),
+          content: const Text(
+            'La aplicación necesita permiso para guardar archivos (JSON/PDF) en tu dispositivo. '
+            'Si no permites el acceso, se guardará una copia en la carpeta interna de la app, '
+            'pero no estará en la carpeta Descargas. ¿Deseas abrir la configuración ahora?',
           ),
-        );
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('No'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Abrir configuración'),
+            ),
+          ],
+        ),
+      );
 
-        if (openSettings == true) {
-          await openAppSettings();
-          try {
-            if (await Permission.storage.status.isGranted) return true;
-            if (await Permission.manageExternalStorage.status.isGranted)
-              return true;
-          } catch (e) {
+      if (openSettings == true) {
+        await openAppSettings();
+        try {
+          if (await Permission.storage.status.isGranted) {
+            return true;
+          }
+          if (await Permission.manageExternalStorage.status.isGranted) {
+            return true;
+          }
+        } catch (e) {
+          if (kDebugMode) {
             print('Error re-check permisos después de configuración: $e');
           }
         }
@@ -477,7 +505,9 @@ class _HomeScreenState extends State<HomeScreen> {
         await prefs.setBool('storage_permission_asked', true);
       }
     } catch (e) {
-      print('Error comprobando SharedPreferences para permisos: $e');
+      if (kDebugMode) {
+        print('Error comprobando SharedPreferences para permisos: $e');
+      }
     }
   }
 
@@ -517,7 +547,9 @@ class _HomeScreenState extends State<HomeScreen> {
         return '$cleanFallback.json';
       }
     } catch (e) {
-      print('Error al parsear JSON para buscar nombre de archivo: $e');
+      if (kDebugMode) {
+        print('Error al parsear JSON para buscar nombre de archivo: $e');
+      }
     }
     if (fallbackName.endsWith('.json')) {
       return fallbackName;
@@ -530,16 +562,23 @@ class _HomeScreenState extends State<HomeScreen> {
     await _controller!.addJavaScriptChannel(
       'FlutterChannel',
       onMessageReceived: (JavaScriptMessage message) async {
-        print('Mensaje recibido de JS: ${message.message}');
+        if (kDebugMode) {
+          print('Mensaje recibido de JS: ${message.message}');
+        }
         try {
           final data = jsonDecode(message.message) as Map<String, dynamic>;
 
           if (data['action'] == 'downloadDTE') {
+            if (kDebugMode) {
+              print('Acción downloadDTE (interceptor JS) recibida.');
+            }
             if (data['processingStarted'] == true) {
-              setState(() {
-                _estaCargando = true;
-                _isDownloading = false;
-              });
+              if (mounted) {
+                setState(() {
+                  _estaCargando = true;
+                  _isDownloading = false;
+                });
+              }
             }
             if (data['data'] != null) {
               final jsonData = data['data'] as Map<String, dynamic>;
@@ -555,10 +594,15 @@ class _HomeScreenState extends State<HomeScreen> {
               }
               if (pdfUrl.isNotEmpty) {
                 await _launchPdfUrl(pdfUrl);
-                setState(() => _estaCargando = false);
+                if (mounted) {
+                  setState(() => _estaCargando = false);
+                }
               }
             }
           } else if (data['action'] == 'downloadFromBlob') {
+            if (kDebugMode) {
+              print('Acción downloadFromBlob (lector de blob) recibida.');
+            }
             final String jsonContent = data['jsonContent'] ?? '';
             if (jsonContent.isNotEmpty) {
               final String fallbackName =
@@ -575,7 +619,12 @@ class _HomeScreenState extends State<HomeScreen> {
           } else if (data['action'] == 'openWindow') {
             try {
               final String url = (data['url'] ?? '').toString();
-              if (url.isEmpty || url == 'about:blank') return;
+              if (url.isEmpty || url == 'about:blank') {
+                if (kDebugMode) {
+                  print('openWindow ignorado para URL vacía/about:blank');
+                }
+                return;
+              }
               final uri = Uri.parse(url);
               if (await canLaunchUrl(uri)) {
                 await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -583,13 +632,20 @@ class _HomeScreenState extends State<HomeScreen> {
                 _showErrorSnackBar('No se pudo abrir el enlace: $url');
               }
             } catch (e) {
+              if (kDebugMode) {
+                print('Error abriendo ventana desde JS: $e');
+              }
               _showErrorSnackBar('Error al abrir enlace desde la página.');
             }
           } else if (data['action'] == 'pdfBlob') {
             final now = DateTime.now();
             if (_lastPdfDownloadTime != null &&
-                now.difference(_lastPdfDownloadTime!) < _pdfCooldown)
+                now.difference(_lastPdfDownloadTime!) < _pdfCooldown) {
+              if (kDebugMode) {
+                print('[pdfBlob] Cooldown: Ignorando descarga duplicada.');
+              }
               return;
+            }
             _lastPdfDownloadTime = now;
             try {
               final String base64Data = data['base64'] ?? '';
@@ -614,33 +670,52 @@ class _HomeScreenState extends State<HomeScreen> {
               Directory downloadsDir = Directory(
                 '/storage/emulated/0/Download',
               );
-              if (!await downloadsDir.exists())
+              if (!await downloadsDir.exists()) {
                 await downloadsDir.create(recursive: true);
+              }
               final String savePath = '${downloadsDir.path}/$filename';
               final bytes = base64Decode(base64Data);
               final file = File(savePath);
               await file.writeAsBytes(bytes, flush: true);
+              if (kDebugMode) {
+                print('[pdfBlob] PDF guardado en: $savePath');
+              }
               try {
                 const platform = MethodChannel(
                   'com.facturacion.sv.app_factura/files',
                 );
                 await platform.invokeMethod('scanFile', {'path': savePath});
               } catch (e) {
-                print('Error solicitando scanFile: $e');
+                if (kDebugMode) {
+                  print('Error solicitando scanFile: $e');
+                }
               }
               _showMessage('Archivo PDF guardado en Descargas: $filename');
               try {
                 final res = await OpenFilex.open(savePath);
-                if (res.type != ResultType.done)
+                if (kDebugMode) {
+                  print('OpenFilex result (pdfBlob): $res');
+                }
+                if (res.type != ResultType.done) {
                   throw Exception('No se pudo abrir el PDF');
+                }
               } catch (e) {
+                if (kDebugMode) {
+                  print('Error abriendo PDF con OpenFilex: $e');
+                }
                 _showErrorSnackBar('Error al abrir el PDF: ${e.toString()}');
               }
             } catch (e) {
+              if (kDebugMode) {
+                print('Error procesando pdfBlob desde JS: $e');
+              }
               _showErrorSnackBar('Error al procesar PDF recibido.');
             }
           }
         } catch (e) {
+          if (kDebugMode) {
+            print('Error procesando mensaje de JS: $e');
+          }
           _showErrorSnackBar('Error procesando datos de la página.');
         }
       },
@@ -650,28 +725,53 @@ class _HomeScreenState extends State<HomeScreen> {
       NavigationDelegate(
         onProgress: (int progress) {},
         onPageStarted: (String url) {
-          if (mounted) setState(() => _estaCargando = true);
+          if (mounted) {
+            setState(() => _estaCargando = true);
+          }
         },
         onPageFinished: (String url) {
-          if (mounted) setState(() => _estaCargando = false);
+          if (mounted) {
+            setState(() => _estaCargando = false);
+          }
           _controller!.runJavaScript(jsInjector);
+          if (kDebugMode) {
+            print("Interceptor JS y helpers inyectados en $url");
+          }
         },
         onWebResourceError: (WebResourceError error) {
-          if (mounted) setState(() => _estaCargando = false);
-          _showErrorSnackBar('Error al cargar recurso: ${error.description}');
+          if (mounted) {
+            setState(() => _estaCargando = false);
+          }
+          if (kDebugMode) {
+            print('Error al cargar recurso: ${error.description}');
+          }
+          _showErrorSnackBar(
+            'Error: ${error.description} (Code: ${error.errorCode})',
+          );
         },
         onNavigationRequest: (NavigationRequest request) async {
           final String url = request.url;
+          if (kDebugMode) {
+            print('NavReq: $url | Main frame: ${request.isMainFrame}');
+          }
           if (url.endsWith('.pdf') ||
               url.endsWith('.zip') ||
               url.endsWith('.doc') ||
               url.endsWith('.docx') ||
               url.endsWith('.xls') ||
               url.endsWith('.xlsx')) {
+            if (kDebugMode) {
+              print('Detectada descarga de archivo directo (fallback): $url');
+            }
             _handleFileDownload(url);
             return NavigationDecision.prevent;
           }
           if (url.startsWith('blob:') && request.isMainFrame) {
+            if (kDebugMode) {
+              print(
+                'Navegación a JSON/Blob detectada. PREVINIENDO y LEYENDO...',
+              );
+            }
             final String blobReadScript =
                 '''
         (async function() {
@@ -708,9 +808,24 @@ class _HomeScreenState extends State<HomeScreen> {
             return NavigationDecision.prevent;
           }
           if (url == 'about:blank' || url.startsWith('javascript:')) {
-            if (url == 'about:blank' && request.isMainFrame)
+            if (url == 'about:blank' && !request.isMainFrame) {
+              if (kDebugMode) {
+                print('Permitiendo navegación de pop-up a: $url');
+              }
+              return NavigationDecision.navigate;
+            }
+            if (url == 'about:blank' && request.isMainFrame) {
+              if (kDebugMode) {
+                print('Bloqueando navegación de frame principal a: $url');
+              }
               return NavigationDecision.prevent;
-            return NavigationDecision.navigate;
+            }
+            if (url.startsWith('javascript:')) {
+              if (kDebugMode) {
+                print('Permitiendo navegación interna: $url');
+              }
+              return NavigationDecision.navigate;
+            }
           }
           final uri = Uri.parse(url);
           final String currentUrl = await _controller!.currentUrl() ?? '';
@@ -720,12 +835,24 @@ class _HomeScreenState extends State<HomeScreen> {
           if (!request.isMainFrame &&
               uri.host.isNotEmpty &&
               uri.host != currentHost) {
+            if (kDebugMode) {
+              print(
+                'Detectado pop-up a host diferente ($url). Abriendo externamente.',
+              );
+            }
+            _showMessage('Abriendo enlace externo...');
+
             if (await canLaunchUrl(uri)) {
               await launchUrl(uri, mode: LaunchMode.externalApplication);
             } else {
               _showErrorSnackBar('No se pudo abrir enlace externo.');
             }
             return NavigationDecision.prevent;
+          }
+          if (kDebugMode) {
+            print(
+              'Navegación normal permitida (isMainFrame: ${request.isMainFrame}, host: ${uri.host}).',
+            );
           }
           return NavigationDecision.navigate;
         },
@@ -739,8 +866,13 @@ class _HomeScreenState extends State<HomeScreen> {
         Uri.parse('https://admin.factura.gob.sv/login'),
       );
     } catch (e) {
+      if (kDebugMode) {
+        print("Error cargando URL inicial: $e");
+      }
       _showErrorSnackBar("No se pudo cargar la página inicial.");
-      if (mounted) setState(() => _estaCargando = false);
+      if (mounted) {
+        setState(() => _estaCargando = false);
+      }
     }
   }
 
@@ -758,22 +890,30 @@ class _HomeScreenState extends State<HomeScreen> {
   ) async {
     try {
       bool hasPermission = await _requestStoragePermissions();
-      if (!hasPermission) throw Exception('Permiso denegado');
+      if (!hasPermission) {
+        throw Exception('Permiso denegado');
+      }
 
       if (Platform.isAndroid) {
         Directory downloadsDir = Directory('/storage/emulated/0/Download');
-        if (!await downloadsDir.exists())
+        if (!await downloadsDir.exists()) {
           await downloadsDir.create(recursive: true);
+        }
         final String savePath = '${downloadsDir.path}/$filename';
         final File file = File(savePath);
         await file.writeAsString(jsonContent, flush: true);
+        if (kDebugMode) {
+          print('[_handleJsonDataDownload] JSON guardado en: $savePath');
+        }
         try {
           const platform = MethodChannel(
             'com.facturacion.sv.app_factura/files',
           );
           await platform.invokeMethod('scanFile', {'path': savePath});
         } catch (e) {
-          print('Error solicitando scanFile: $e');
+          if (kDebugMode) {
+            print('Error solicitando scanFile: $e');
+          }
         }
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -788,6 +928,9 @@ class _HomeScreenState extends State<HomeScreen> {
         final String savePath = '${directory.path}/$filename';
         final File file = File(savePath);
         await file.writeAsString(jsonContent, flush: true);
+        if (kDebugMode) {
+          print('[_handleJsonDataDownload] JSON guardado en: $savePath');
+        }
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -798,6 +941,9 @@ class _HomeScreenState extends State<HomeScreen> {
         }
       }
     } catch (e) {
+      if (kDebugMode) {
+        print("[_handleJsonDataDownload] *** ERROR AL GUARDAR JSON: $e");
+      }
       _showErrorSnackBar('Error al guardar archivo JSON: ${e.toString()}');
     }
   }
@@ -805,21 +951,27 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _launchPdfUrl(String pdfUrl) async {
     final now = DateTime.now();
     if (_lastPdfDownloadTime != null &&
-        now.difference(_lastPdfDownloadTime!) < _pdfCooldown)
+        now.difference(_lastPdfDownloadTime!) < _pdfCooldown) {
       return;
+    }
     _lastPdfDownloadTime = now;
 
     String cleanUrl = pdfUrl.trim();
-    if (!cleanUrl.startsWith('http')) cleanUrl = 'https://$cleanUrl';
+    if (!cleanUrl.startsWith('http')) {
+      cleanUrl = 'https://$cleanUrl';
+    }
     final uri = Uri.parse(cleanUrl);
 
     try {
       final bool hasPerm = await _requestStoragePermissions();
-      if (!hasPerm) throw Exception('Permiso denegado');
+      if (!hasPerm) {
+        throw Exception('Permiso denegado');
+      }
 
       Directory downloadsDir = Directory('/storage/emulated/0/Download');
-      if (!await downloadsDir.exists())
+      if (!await downloadsDir.exists()) {
         await downloadsDir.create(recursive: true);
+      }
 
       final String originalFileName = uri.pathSegments.isNotEmpty
           ? uri.pathSegments.last
@@ -849,17 +1001,25 @@ class _HomeScreenState extends State<HomeScreen> {
         const platform = MethodChannel('com.facturacion.sv.app_factura/files');
         await platform.invokeMethod('scanFile', {'path': savePath});
       } catch (e) {
-        print('Error solicitando scanFile: $e');
+        if (kDebugMode) {
+          print('Error solicitando scanFile: $e');
+        }
       }
 
       _showMessage('Archivo PDF guardado en Descargas: $fileName');
       final result = await OpenFilex.open(savePath);
+      if (kDebugMode) {
+        print('OpenFilex result: $result');
+      }
       if (result.type != ResultType.done) {
         throw Exception(
           'OpenFilex no pudo abrir el archivo: ${result.message}',
         );
       }
     } catch (e) {
+      if (kDebugMode) {
+        print('No fue posible descargar/abrir localmente el PDF: $e');
+      }
       _showErrorSnackBar('No se pudo abrir el PDF localmente: ${e.toString()}');
       try {
         if (await canLaunchUrl(uri)) {
@@ -868,6 +1028,9 @@ class _HomeScreenState extends State<HomeScreen> {
           await launchUrl(uri, mode: LaunchMode.inAppWebView);
         }
       } catch (e2) {
+        if (kDebugMode) {
+          print('Error en fallback al abrir PDF: $e2');
+        }
         _showErrorSnackBar('No se pudo abrir el PDF de ninguna forma');
       }
     } finally {
@@ -884,8 +1047,9 @@ class _HomeScreenState extends State<HomeScreen> {
     if (url.endsWith('.pdf') || (customFileName ?? '').endsWith('.pdf')) {
       final now = DateTime.now();
       if (_lastPdfDownloadTime != null &&
-          now.difference(_lastPdfDownloadTime!) < _pdfCooldown)
+          now.difference(_lastPdfDownloadTime!) < _pdfCooldown) {
         return;
+      }
       _lastPdfDownloadTime = now;
     }
 
@@ -917,12 +1081,15 @@ class _HomeScreenState extends State<HomeScreen> {
       var status = await Permission.storage.status;
       if (!status.isGranted) {
         status = await Permission.storage.request();
-        if (!status.isGranted) throw Exception('Permiso denegado');
+        if (!status.isGranted) {
+          throw Exception('Permiso denegado');
+        }
       }
 
       Directory downloadsDir = Directory('/storage/emulated/0/Download');
-      if (!await downloadsDir.exists())
+      if (!await downloadsDir.exists()) {
         await downloadsDir.create(recursive: true);
+      }
       final String savePath = '${downloadsDir.path}/$fileName';
 
       Dio dio = Dio();
@@ -942,7 +1109,9 @@ class _HomeScreenState extends State<HomeScreen> {
         const platform = MethodChannel('com.facturacion.sv.app_factura/files');
         await platform.invokeMethod('scanFile', {'path': savePath});
       } catch (e) {
-        print('Error solicitando scanFile: $e');
+        if (kDebugMode) {
+          print('Error solicitando scanFile: $e');
+        }
       }
 
       if (mounted) {
@@ -953,6 +1122,9 @@ class _HomeScreenState extends State<HomeScreen> {
         }
       }
     } catch (e) {
+      if (kDebugMode) {
+        print('Error en la descarga: $e');
+      }
       _showErrorSnackBar('Error al descargar el archivo: ${e.toString()}');
     } finally {
       if (mounted) {
@@ -965,20 +1137,22 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _showError(String message) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Theme.of(context).colorScheme.error,
-      ),
-    );
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
+    }
   }
 
   void _showMessage(String message) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.green[700]),
-    );
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message), backgroundColor: Colors.green[700]),
+      );
+    }
   }
 
   Future<void> _activateApp() async {
@@ -992,29 +1166,36 @@ class _HomeScreenState extends State<HomeScreen> {
       final newStatus = await _storage.activateLicense(key);
       _activationKeyController.clear();
       widget.onStatusChangeNeeded();
-      if (mounted) setState(() => _activationStatus = newStatus);
+      if (mounted) {
+        setState(() => _activationStatus = newStatus);
+      }
       if (newStatus == ActivationStatus.pro) {
         _showMessage('¡Aplicación activada a PRO!');
       } else if (newStatus == ActivationStatus.demo) {
         _showMessage('Versión DEMO activada.');
       }
-      // El 'else' para clave incorrecta se maneja automáticamente por el 'catch'
     } catch (e) {
       _showError(
         e.toString(),
       ); // Muestra el mensaje exacto de la Cloud Function
     } finally {
-      if (mounted) setState(() => _isActivating = false);
+      if (mounted) {
+        setState(() => _isActivating = false);
+      }
     }
   }
 
   Future<bool> handlePop() async {
-    if (!_showWebView) return false;
+    if (!_showWebView) {
+      return false;
+    }
     final canGoBack = await _controller?.canGoBack() ?? false;
     if (canGoBack) {
       _controller!.goBack();
       return true;
     } else {
+      // <<< FIX: `use_build_context_synchronously` --- >>>
+      if (!mounted) return true; // Permite salir si ya no está montado
       final bool? shouldClose = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
@@ -1034,7 +1215,9 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
       );
-      if (shouldClose == true && mounted) setState(() => _showWebView = false);
+      if (shouldClose == true && mounted) {
+        setState(() => _showWebView = false);
+      }
       return true;
     }
   }
@@ -1091,6 +1274,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   icon: const Icon(Icons.settings),
                   tooltip: 'Configuración',
                   onPressed: () async {
+                    // <<< FIX: `use_build_context_synchronously` --- >>>
+                    if (!mounted) return;
                     await Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -1099,8 +1284,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     );
                     widget.onStatusChangeNeeded();
                     final newStatus = await _storage.getActivationStatus();
-                    if (mounted && newStatus != _activationStatus)
+                    if (mounted && newStatus != _activationStatus) {
                       setState(() => _activationStatus = newStatus);
+                    }
                   },
                 ),
               ],
@@ -1148,11 +1334,13 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildWebViewUI() {
-    if (_controller == null)
+    if (_controller == null) {
       return const Center(child: CircularProgressIndicator());
+    }
     return Stack(
       children: [
         WebViewWidget(controller: _controller!),
+        // <<< FIX: Llaves {} eliminadas >>>
         if (_estaCargando) const Center(child: CircularProgressIndicator()),
         if (_isDownloading)
           Positioned(
@@ -1339,16 +1527,21 @@ class _HomeScreenState extends State<HomeScreen> {
                   Image.asset(
                     'assets/images/cardPrincipal.png',
                     fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => Container(
-                      height: 150,
-                      color: Colors.grey[200],
-                      alignment: Alignment.center,
-                      child: const Icon(
-                        Icons.broken_image,
-                        color: Colors.grey,
-                        size: 40,
-                      ),
-                    ),
+                    errorBuilder: (context, error, stackTrace) {
+                      if (kDebugMode) {
+                        print("Error cargando imagen: $error");
+                      }
+                      return Container(
+                        height: 150,
+                        color: Colors.grey[200],
+                        alignment: Alignment.center,
+                        child: const Icon(
+                          Icons.broken_image,
+                          color: Colors.grey,
+                          size: 40,
+                        ),
+                      );
+                    },
                   ),
                   Divider(height: 1, color: Colors.grey[300]),
                   Padding(
@@ -1369,6 +1562,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
         ),
+        // <<< FIX: Llaves {} eliminadas >>>
         if (!isEnabled)
           Padding(
             padding: const EdgeInsets.only(top: 8.0),
@@ -1394,7 +1588,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-// --- BlankPageWithNav, _mostrarMenuFlotante y nueva función para siembra ---
+// --- BlankPageWithNav, _mostrarMenuFlotante ---
 class BlankPageWithNav extends StatelessWidget {
   const BlankPageWithNav({super.key});
   @override
@@ -1425,6 +1619,8 @@ class BlankPageWithNav extends StatelessWidget {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
+          // <<< FIX: `use_build_context_synchronously` --- >>>
+          if (!context.mounted) return;
           _mostrarMenuFlotante(context, null, () {});
         },
         child: const Icon(Icons.edit),

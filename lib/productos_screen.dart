@@ -56,6 +56,7 @@ class ProductosScreenState extends State<ProductosScreen> {
         _productoParaEditar = null;
       });
     } catch (e) {
+      if (!mounted) return;
       _showError('Error al cargar productos: ${e.toString()}');
       if (!mounted) return;
       setState(() {
@@ -97,6 +98,7 @@ class ProductosScreenState extends State<ProductosScreen> {
   }
 
   void _onDeleteProducto(String id) async {
+    if (!mounted) return;
     final bool? confirmed = await showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -132,15 +134,10 @@ class ProductosScreenState extends State<ProductosScreen> {
     final theme = Theme.of(context);
     final bool allowWriteActions =
         widget.currentStatus != ActivationStatus.none;
-    final bool isPro = widget.currentStatus == ActivationStatus.pro;
 
     return Scaffold(
-      // <<< CAMBIO: Fondo blanco forzado >>>
       backgroundColor: colorBlanco,
-      appBar: AppBar(
-        title: const Text('Gestionar Productos'),
-        // <<< CAMBIO: Eliminados elevation y backgroundColor para usar tema >>>
-      ),
+      appBar: AppBar(title: const Text('Gestionar Productos')),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : ListView(
@@ -179,7 +176,7 @@ class ProductosScreenState extends State<ProductosScreen> {
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
-                        'Límite alcanzado (${kMaxDemoProducts} productos). Actualiza a PRO para agregar más.',
+                        'Límite alcanzado ($kMaxDemoProducts productos). Actualiza a PRO para agregar más.',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           color: Colors.orange[800],
@@ -250,7 +247,7 @@ class ProductosScreenState extends State<ProductosScreen> {
                                       Icons.delete_outline,
                                       color: allowWriteActions
                                           ? colorTextoSecundario
-                                          : Colors.grey.withOpacity(0.5),
+                                          : Colors.grey.withAlpha(128),
                                       size: 20,
                                     ),
                                     onPressed: allowWriteActions
@@ -275,9 +272,9 @@ class ProductosScreenState extends State<ProductosScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: colorCelestePastel.withOpacity(0.1),
+        color: colorCelestePastel.withAlpha(26),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: colorCelestePastel.withOpacity(0.3)),
+        border: Border.all(color: colorCelestePastel.withAlpha(77)),
       ),
       child: Row(
         children: [
@@ -313,7 +310,7 @@ class ProductosScreenState extends State<ProductosScreen> {
   }
 }
 
-// --- CLASE _ProductoForm (Sin cambios) ---
+// --- CLASE _ProductoForm ---
 class _ProductoForm extends StatefulWidget {
   final ActivationStatus status;
   final Producto? productoInicial;
@@ -357,7 +354,9 @@ class _ProductoFormState extends State<_ProductoForm> {
     _descripcionCtrl.text = _producto.descripcion;
     _precioCtrl.text = _producto.precio;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) setState(() {});
+      if (mounted) {
+        setState(() {});
+      }
     });
   }
 
@@ -369,6 +368,7 @@ class _ProductoFormState extends State<_ProductoForm> {
   }
 
   void _guardar() {
+    if (!mounted) return;
     if (widget.status == ActivationStatus.none) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -409,8 +409,7 @@ class _ProductoFormState extends State<_ProductoForm> {
     final bool allowWriteActions = widget.status != ActivationStatus.none;
     final bool canAddNew =
         widget.status == ActivationStatus.pro ||
-        (widget.status ==
-            ActivationStatus.demo /* && numProductos < kMaxDemoItems */ );
+        (widget.status == ActivationStatus.demo);
 
     return Form(
       key: _formKey,
@@ -445,8 +444,9 @@ class _ProductoFormState extends State<_ProductoForm> {
                               )
                               .toList(),
                           onChanged: (val) {
-                            if (val != null)
+                            if (val != null) {
                               setState(() => _producto.tipo = val);
+                            }
                           },
                         ),
                       ),
@@ -464,8 +464,9 @@ class _ProductoFormState extends State<_ProductoForm> {
                               )
                               .toList(),
                           onChanged: (val) {
-                            if (val != null)
+                            if (val != null) {
                               setState(() => _producto.unidadMedida = val);
+                            }
                           },
                         ),
                       ),
@@ -489,9 +490,13 @@ class _ProductoFormState extends State<_ProductoForm> {
                       FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d*')),
                     ],
                     validator: (val) {
-                      if (val == null || val.isEmpty) return 'Campo requerido';
-                      if (double.tryParse(val) == null)
+                      if (val == null || val.isEmpty) {
+                        return 'Campo requerido';
+                      }
+
+                      if (double.tryParse(val) == null) {
                         return 'Ingrese un número válido';
+                      }
                       return null;
                     },
                   ),
@@ -571,15 +576,25 @@ class _ProductoFormState extends State<_ProductoForm> {
     required Function(T?) onChanged,
   }) {
     final theme = Theme.of(context);
+
+    // <<< FIX: `deprecated_member_use` --- >>>
+    // La forma moderna es usar 'initialValue' SI el controlador es nulo,
+    // pero DropdownButtonFormField usa 'value'. El truco es asegurarse
+    // de que 'value' sea null si no está en la lista de 'items'.
+    final T? currentValue = (items.any((item) => item.value == value))
+        ? value
+        : null;
+
     return DropdownButtonFormField<T>(
-      value: value,
+      value: currentValue, // Usamos el valor saneado
       items: items
           .map(
             (item) => DropdownMenuItem<T>(
               value: item.value,
               child: DefaultTextStyle(
                 style: theme.textTheme.bodyLarge ?? const TextStyle(),
-                child: item.child!,
+                // <<< FIX: `unnecessary_non_null_assertion` ('!' eliminado) >>>
+                child: item.child,
               ),
             ),
           )

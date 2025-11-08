@@ -1,6 +1,6 @@
 // lib/models.dart
 
-import 'dart:convert';
+// import 'dart:convert'; // <<< FIX: Eliminado (no se usa)
 import 'package:flutter/material.dart';
 import 'main.dart';
 
@@ -21,7 +21,7 @@ enum ActivationStatus {
       case ActivationStatus.demo:
         return 'Versión limitada';
       case ActivationStatus.none:
-      default:
+        // <<< FIX: `unreachable_switch_default` (eliminado 'default') >>>
         return 'Sin activación';
     }
   }
@@ -33,7 +33,7 @@ enum ActivationStatus {
       case ActivationStatus.demo:
         return 'Versión limitada: Funcionalidades limitadas.';
       case ActivationStatus.none:
-      default:
+        // <<< FIX: `unreachable_switch_default` (eliminado 'default') >>>
         return 'La aplicación no está activada. Introduce la clave en la pantalla de Inicio.';
     }
   }
@@ -45,7 +45,7 @@ enum ActivationStatus {
       case ActivationStatus.demo:
         return Colors.orange[800] ?? Colors.orange;
       case ActivationStatus.none:
-      default:
+        // <<< FIX: `unreachable_switch_default` (eliminado 'default') >>>
         return colorTextoSecundario; // Asegúrate de que colorTextoSecundario esté definido o usa Colors.grey
     }
   }

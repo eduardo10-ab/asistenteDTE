@@ -1,23 +1,17 @@
-// lib/main.dart
+// lib/main_new.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'dart:io';
-import 'package:dio/dio.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:url_launcher/url_launcher.dart';
-import 'package:share_plus/share_plus.dart';
-import 'dart:convert';
+import 'package:flutter/foundation.dart'; // <<< FIX: Agregado para kDebugMode
 
 // --- Imports locales ---
 import 'clientes_perfiles_screen.dart';
 import 'productos_screen.dart';
-import 'configuracion_screen.dart';
 import 'menu_flotante_widget.dart';
 import 'models.dart';
 import 'storage_service.dart';
-import 'js_injection.dart';
-import 'pdf_viewer_screen.dart';
 import 'home_screen.dart';
 // Asegúrate de que HomeScreenState esté exportado desde home_screen.dart
 
@@ -56,7 +50,8 @@ class MyApp extends StatelessWidget {
           secondary: colorAzulActivo,
           surface: colorBlanco,
           onSurface: colorTextoPrincipal,
-          surfaceVariant: colorGrisClaro,
+          // <<< FIX: 'surfaceVariant' obsoleto reemplazado >>>
+          surfaceContainerHighest: colorGrisClaro,
           onSurfaceVariant: colorTextoPrincipal,
           onPrimary: colorTextoPrincipal,
           onSecondary: Colors.white,
@@ -239,17 +234,26 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   Future<void> _reloadActivationStatus() async {
-    print("Recargando estado...");
+    // <<< FIX: Reemplazado print() con kDebugMode >>>
+    if (kDebugMode) {
+      print("Recargando estado...");
+    }
     final status = await _storage.getActivationStatus();
     if (!mounted) return;
     if (status != _activationStatus) {
-      print("¡Estado cambió a $status!");
+      // <<< FIX: Reemplazado print() con kDebugMode >>>
+      if (kDebugMode) {
+        print("¡Estado cambió a $status!");
+      }
       setState(() {
         _activationStatus = status;
         _buildScreens();
       });
     } else {
-      print("Estado no cambió.");
+      // <<< FIX: Reemplazado print() con kDebugMode >>>
+      if (kDebugMode) {
+        print("Estado no cambió.");
+      }
     }
   }
 
@@ -300,6 +304,8 @@ class _MainScreenState extends State<MainScreen> {
         body: IndexedStack(index: _selectedIndex, children: _widgetOptions),
         floatingActionButton: FloatingActionButton(
           onPressed: () {
+            // <<< FIX: `use_build_context_synchronously` --- >>>
+            if (!context.mounted) return;
             _mostrarMenuFlotante(
               context,
               _webViewController,
