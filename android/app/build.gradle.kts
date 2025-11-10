@@ -8,6 +8,8 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+import java.util.Properties // Importar la clase Properties
+
 android {
     namespace = "com.facturacion.sv.app_factura"
     compileSdk = flutter.compileSdkVersion
@@ -21,6 +23,33 @@ android {
     kotlinOptions {
         jvmTarget = JavaVersion.VERSION_11.toString()
     }
+    
+    // --- INICIO: Bloque de Configuración de Firma para Producción ---
+    signingConfigs {
+        create("release") {
+            val keystoreProperties = Properties()
+            val keystoreFile = rootProject.file("key.properties")
+            
+            // Cargar las propiedades si el archivo existe
+            if (keystoreFile.exists()) {
+                keystoreFile.inputStream().use {
+                    keystoreProperties.load(it)
+                }
+            } else {
+                // Imprimir error si el archivo no se encuentra (para debugging)
+                println("ERROR: El archivo key.properties NO fue encontrado en la carpeta android/. Usando configuracion debug temporal.")
+            }
+
+            // Asignar los valores del archivo key.properties
+            // Si key.properties no existe, estos valores seran vacios.
+            storeFile = file(keystoreProperties.getProperty("storeFile") ?: "")
+            storePassword = keystoreProperties.getProperty("storePassword")
+            keyAlias = keystoreProperties.getProperty("keyAlias")
+            keyPassword = keystoreProperties.getProperty("keyPassword")
+        }
+    }
+    // --- FIN: Bloque de Configuración de Firma para Producción ---
+
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
@@ -35,9 +64,8 @@ android {
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            // Se elimina el uso de signingConfigs.getByName("debug") y se usa la nueva configuracion "release"
+            signingConfig = signingConfigs.getByName("release") 
         }
     }
 }
