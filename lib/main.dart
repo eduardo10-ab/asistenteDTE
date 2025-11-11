@@ -8,12 +8,9 @@ import 'package:open_filex/open_filex.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
-// import 'package:share_plus/share_plus.dart'; // No usado
-// import 'package:cross_file/cross_file.dart'; // No usado
 import 'package:path_provider/path_provider.dart';
 import 'dart:convert';
 import 'package:firebase_core/firebase_core.dart';
-// import 'package:cloud_firestore/cloud_firestore.dart'; // No usado aquí
 import 'firebase_options.dart';
 import 'package:flutter/foundation.dart'; // Para kDebugMode
 
@@ -390,12 +387,16 @@ class _HomeScreenState extends State<HomeScreen> {
   DateTime? _lastPdfDownloadTime;
   final Duration _pdfCooldown = const Duration(seconds: 5);
 
+  // INICIO: FUNCIÓN DE PERMISOS (SOLO SE ELIMINA EL DIÁLOGO FLOTANTE)
   Future<bool> _requestStoragePermissions() async {
     if (kDebugMode) {
       print('Solicitando permisos de almacenamiento...');
     }
 
     if (Platform.isAndroid) {
+      // Pedir el permiso de almacenamiento antiguo (solo para Android <= 10, maxSdkVersion=29)
+      // Esto solo lo hacemos para que el código no falle en Android antiguo y para que
+      // el Platform Channel se comporte correctamente.
       try {
         var storageStatus = await Permission.storage.status;
         if (storageStatus.isGranted) {
@@ -410,66 +411,47 @@ class _HomeScreenState extends State<HomeScreen> {
           print('Warning: error comprobando Permission.storage: $e');
         }
       }
-      try {
-        var manageStatus = await Permission.manageExternalStorage.status;
-        if (manageStatus.isGranted) {
-          return true;
-        }
-        final manageRequest = await Permission.manageExternalStorage.request();
-        if (manageRequest.isGranted) {
-          return true;
-        }
-      } catch (e) {
-        if (kDebugMode) {
-          print('Notice: manageExternalStorage no disponible o fallo: $e');
-        }
-      }
-      if (!mounted) return false;
-      final bool? openSettings = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Permiso necesario'),
-          content: const Text(
-            'La aplicación necesita permiso para guardar archivos (JSON/PDF) en tu dispositivo. '
-            'Si no permites el acceso, se guardará una copia en la carpeta interna de la app, '
-            'pero no estará en la carpeta Descargas. ¿Deseas abrir la configuración ahora?',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('No'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('Abrir configuración'),
-            ),
-          ],
-        ),
-      );
 
-      if (openSettings == true) {
-        await openAppSettings();
-        try {
-          if (await Permission.storage.status.isGranted) {
-            return true;
-          }
-          if (await Permission.manageExternalStorage.status.isGranted) {
-            return true;
-          }
-        } catch (e) {
-          if (kDebugMode) {
-            print('Error re-check permisos después de configuración: $e');
-          }
-        }
-      }
+      // El diálogo de permisos (showDialog) ha sido ELIMINADO permanentemente.
+      // Si el permiso falla, el guardado público nativo (Kotlin) toma el control.
       return false;
     }
+    // iOS/Otros: El permiso de storage es una buena práctica
     var status = await Permission.storage.status;
     if (!status.isGranted) {
       status = await Permission.storage.request();
     }
     return status.isGranted;
   }
+  // FIN: FUNCIÓN DE PERMISOS
+
+  // INICIO: FUNCIÓN DE GUARDADO PÚBLICO
+  Future<String> _saveFileToDownloadsPublic(
+    Uint8List data,
+    String filename,
+  ) async {
+    try {
+      const platform = MethodChannel('com.facturacion.sv.app_factura/files');
+
+      final String? savePath = await platform.invokeMethod('saveToDownloads', {
+        'data': data,
+        'filename': filename,
+      });
+
+      if (savePath == null || savePath.isEmpty) {
+        throw Exception(
+          'Error nativo: La ruta de guardado es nula o vacía. ¿Falta implementar Kotlin?',
+        );
+      }
+      return savePath;
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error en _saveFileToDownloadsPublic: $e');
+      }
+      rethrow;
+    }
+  }
+  // FIN: FUNCIÓN DE GUARDADO PÚBLICO
 
   @override
   void initState() {
@@ -483,6 +465,7 @@ class _HomeScreenState extends State<HomeScreen> {
       final prefs = await SharedPreferences.getInstance();
       final asked = prefs.getBool('storage_permission_asked') ?? false;
       if (!asked) {
+        // Se llama a la función sin mostrar el diálogo, solo para registrar el estado
         await _requestStoragePermissions();
         await prefs.setBool('storage_permission_asked', true);
       }
@@ -597,6 +580,7 @@ class _HomeScreenState extends State<HomeScreen> {
             } else {
               _showErrorSnackBar('Error: El blob JSON estaba vacío.');
             }
+            // <<< RESTAURADO: Notificación de descarga de JSON (Blob) >>>
             _showMessage('JSON descargado. Se abrirá una ventana para el PDF.');
           } else if (data['action'] == 'openWindow') {
             try {
@@ -644,21 +628,16 @@ class _HomeScreenState extends State<HomeScreen> {
                 _showErrorSnackBar('PDF vacío o no válido.');
                 return;
               }
-              final bool hasPerm = await _requestStoragePermissions();
-              if (!hasPerm) {
-                _showErrorSnackBar('Permiso necesario para guardar el PDF.');
-                return;
-              }
-              Directory downloadsDir = Directory(
-                '/storage/emulated/0/Download',
-              );
-              if (!await downloadsDir.exists()) {
-                await downloadsDir.create(recursive: true);
-              }
-              final String savePath = '${downloadsDir.path}/$filename';
+
               final bytes = base64Decode(base64Data);
-              final file = File(savePath);
-              await file.writeAsBytes(bytes, flush: true);
+
+              // INICIO: USO DEL NUEVO GUARDADO PÚBLICO
+              final String savePath = await _saveFileToDownloadsPublic(
+                bytes,
+                filename,
+              );
+              // FIN: USO DEL NUEVO GUARDADO PÚBLICO
+
               if (kDebugMode) {
                 print('[pdfBlob] PDF guardado en: $savePath');
               }
@@ -672,6 +651,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   print('Error solicitando scanFile: $e');
                 }
               }
+              // <<< RESTAURADO: Notificación de descarga de PDF (Blob) >>>
               _showMessage('Archivo PDF guardado en Descargas: $filename');
               try {
                 final res = await OpenFilex.open(savePath);
@@ -691,7 +671,9 @@ class _HomeScreenState extends State<HomeScreen> {
               if (kDebugMode) {
                 print('Error procesando pdfBlob desde JS: $e');
               }
-              _showErrorSnackBar('Error al procesar PDF recibido.');
+              _showErrorSnackBar(
+                'Error al procesar PDF recibido: ${e.toString()}',
+              );
             }
           }
         } catch (e) {
@@ -786,6 +768,7 @@ class _HomeScreenState extends State<HomeScreen> {
         })();
             ''';
             _controller?.runJavaScript(blobReadScript);
+            // <<< RESTAURADO: Notificación de Procesamiento >>>
             _showMessage('Procesando JSON/PDF...');
             return NavigationDecision.prevent;
           }
@@ -871,19 +854,18 @@ class _HomeScreenState extends State<HomeScreen> {
     String filename,
   ) async {
     try {
-      bool hasPermission = await _requestStoragePermissions();
-      if (!hasPermission) {
-        throw Exception('Permiso denegado');
-      }
+      // Pedimos permiso de almacenamiento (solo relevante para Android < 11)
+      await _requestStoragePermissions();
 
       if (Platform.isAndroid) {
-        Directory downloadsDir = Directory('/storage/emulated/0/Download');
-        if (!await downloadsDir.exists()) {
-          await downloadsDir.create(recursive: true);
-        }
-        final String savePath = '${downloadsDir.path}/$filename';
-        final File file = File(savePath);
-        await file.writeAsString(jsonContent, flush: true);
+        // USO DEL NUEVO GUARDADO PÚBLICO
+        final Uint8List dataBytes = utf8.encode(jsonContent);
+        final String savePath = await _saveFileToDownloadsPublic(
+          dataBytes,
+          filename,
+        );
+        // FIN: USO DEL NUEVO GUARDADO PÚBLICO
+
         if (kDebugMode) {
           print('[_handleJsonDataDownload] JSON guardado en: $savePath');
         }
@@ -897,15 +879,17 @@ class _HomeScreenState extends State<HomeScreen> {
             print('Error solicitando scanFile: $e');
           }
         }
+        // <<< RESTAURADO: Notificación de descarga de JSON (SnackBar) >>>
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('JSON guardado: $filename'),
-              duration: const Duration(seconds: 2),
+              content: Text('JSON guardado en Descargas: $filename'),
+              duration: const Duration(seconds: 4),
             ),
           );
         }
       } else {
+        // Lógica de guardado anterior para iOS/Otros
         final directory = await getApplicationDocumentsDirectory();
         final String savePath = '${directory.path}/$filename';
         final File file = File(savePath);
@@ -945,15 +929,9 @@ class _HomeScreenState extends State<HomeScreen> {
     final uri = Uri.parse(cleanUrl);
 
     try {
-      final bool hasPerm = await _requestStoragePermissions();
-      if (!hasPerm) {
-        throw Exception('Permiso denegado');
-      }
+      await _requestStoragePermissions();
 
-      Directory downloadsDir = Directory('/storage/emulated/0/Download');
-      if (!await downloadsDir.exists()) {
-        await downloadsDir.create(recursive: true);
-      }
+      // La creación de la carpeta local ya no es necesaria, MediaStore lo maneja.
 
       final String originalFileName = uri.pathSegments.isNotEmpty
           ? uri.pathSegments.last
@@ -963,12 +941,15 @@ class _HomeScreenState extends State<HomeScreen> {
           : 'documento.pdf';
       final String timestamp = DateTime.now().millisecondsSinceEpoch.toString();
       final String fileName = '${timestamp}_$originalFileName';
-      final String savePath = '${downloadsDir.path}/$fileName';
+
+      // Descargamos el archivo a un directorio temporal interno primero
+      final Directory tempDir = await getTemporaryDirectory();
+      final String tempPath = '${tempDir.path}/$fileName';
 
       Dio dio = Dio();
       await dio.download(
         cleanUrl,
-        savePath,
+        tempPath,
         onReceiveProgress: (rec, total) {
           if (total != -1 && mounted) {
             setState(() {
@@ -979,6 +960,20 @@ class _HomeScreenState extends State<HomeScreen> {
         },
       );
 
+      // Leemos los bytes del archivo temporal
+      final File tempFile = File(tempPath);
+      final Uint8List fileBytes = await tempFile.readAsBytes();
+
+      // INICIO: USO DEL NUEVO GUARDADO PÚBLICO
+      final String savePath = await _saveFileToDownloadsPublic(
+        fileBytes,
+        fileName,
+      );
+      // FIN: USO DEL NUEVO GUARDADO PÚBLICO
+
+      // Eliminamos el archivo temporal
+      await tempFile.delete();
+
       try {
         const platform = MethodChannel('com.facturacion.sv.app_factura/files');
         await platform.invokeMethod('scanFile', {'path': savePath});
@@ -988,7 +983,9 @@ class _HomeScreenState extends State<HomeScreen> {
         }
       }
 
+      // <<< RESTAURADO: Notificación de descarga de PDF (URL) >>>
       _showMessage('Archivo PDF guardado en Descargas: $fileName');
+
       final result = await OpenFilex.open(savePath);
       if (kDebugMode) {
         print('OpenFilex result: $result');
@@ -1060,24 +1057,16 @@ class _HomeScreenState extends State<HomeScreen> {
     });
 
     try {
-      var status = await Permission.storage.status;
-      if (!status.isGranted) {
-        status = await Permission.storage.request();
-        if (!status.isGranted) {
-          throw Exception('Permiso denegado');
-        }
-      }
+      await _requestStoragePermissions();
 
-      Directory downloadsDir = Directory('/storage/emulated/0/Download');
-      if (!await downloadsDir.exists()) {
-        await downloadsDir.create(recursive: true);
-      }
-      final String savePath = '${downloadsDir.path}/$fileName';
+      // Descargamos el archivo a un directorio temporal interno primero
+      final Directory tempDir = await getTemporaryDirectory();
+      final String tempPath = '${tempDir.path}/$fileName';
 
       Dio dio = Dio();
       await dio.download(
         url,
-        savePath,
+        tempPath,
         onReceiveProgress: (received, total) {
           if (total != -1 && mounted) {
             setState(() {
@@ -1086,6 +1075,20 @@ class _HomeScreenState extends State<HomeScreen> {
           }
         },
       );
+
+      // Leemos los bytes del archivo temporal
+      final File tempFile = File(tempPath);
+      final Uint8List fileBytes = await tempFile.readAsBytes();
+
+      // INICIO: USO DEL NUEVO GUARDADO PÚBLICO
+      final String savePath = await _saveFileToDownloadsPublic(
+        fileBytes,
+        fileName,
+      );
+      // FIN: USO DEL NUEVO GUARDADO PÚBLICO
+
+      // Eliminamos el archivo temporal
+      await tempFile.delete();
 
       try {
         const platform = MethodChannel('com.facturacion.sv.app_factura/files');
@@ -1096,6 +1099,7 @@ class _HomeScreenState extends State<HomeScreen> {
         }
       }
 
+      // <<< RESTAURADO: Notificación de descarga de Archivo General >>>
       if (mounted) {
         if (url.endsWith('.pdf')) {
           _showMessage('Archivo PDF guardado en Descargas: $fileName');
@@ -1407,10 +1411,9 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(height: 16),
             Text(
               'Para la activación de todas las funcionalidades por favor contactarnos al: ',
-              style: theme.textTheme.bodyLarge?.copyWith(
-                color: theme.disabledColor,
-              ),
+              style: theme.textTheme.bodyMedium,
             ),
+            const SizedBox(height: 16),
             Text(
               '7727-8551 o 7722-0472',
               style: theme.textTheme.bodyLarge?.copyWith(
@@ -1448,6 +1451,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     )
                   : const Text('Activar'),
             ),
+            const SizedBox(height: 16),
+            Text('Clave DEMO: DEMO-2025', style: theme.textTheme.bodyMedium),
           ],
         ),
       ),

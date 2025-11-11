@@ -1,21 +1,19 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     package="com.facturacion.sv.app_factura">
+
     <uses-permission android:name="android.permission.INTERNET" />
+
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="29" tools:replace="android:maxSdkVersion" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="29" tools:replace="android:maxSdkVersion" />
-    <!-- Permisos específicos de media eliminados: no son necesarios para descargar JSON/PDF -->
-    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
-    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <application
         android:label="Asistente de facturación DTE"
         android:name="${applicationName}"
         android:icon="@mipmap/launcher_icon"
-        android:requestLegacyExternalStorage="true">
-
+        >
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -38,7 +36,8 @@
             android:value="2" />
 
     </application>
-<queries>
+    
+    <queries>
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
@@ -56,5 +55,5 @@
           <action android:name="android.intent.action.VIEW" />
           <data android:scheme="mailto" />
         </intent>
-        </queries>
+    </queries>
 </manifest>
