@@ -11,7 +11,8 @@ import 'main.dart'; // Para colores del tema general
 
 // --- INICIO: IMPORTACIONES OCR ---
 import 'package:image_picker/image_picker.dart';
-import 'scan_dui_util.dart';
+import 'scan_dui_util.dart'; // El que ya teníamos
+import 'scan_passport_util.dart'; // El parser de pasaportes
 // --- FIN: IMPORTACIONES OCR ---
 
 // --- COLORES ESPECÍFICOS ---
@@ -38,6 +39,8 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
   Cliente? _clienteParaEditar;
   bool _mostrarFormCliente = false;
 
+  String _clientType = 'El Salvador'; // 'El Salvador' o 'Extranjero'
+
   @override
   void initState() {
     super.initState();
@@ -60,7 +63,6 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
       final profile = await _storage.getCurrentProfileName();
       final names = await _storage.getProfileNames();
       final clientes = await _storage.getClientes();
-      // <<< FIX: `use_build_context_synchronously` --- >>>
       if (!mounted) return;
       setState(() {
         _perfilActivo = profile;
@@ -71,7 +73,6 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
         _clienteParaEditar = null;
       });
     } catch (e) {
-      // <<< FIX: `use_build_context_synchronously` --- >>>
       if (!mounted) return;
       _showError(e.toString());
       setState(() {
@@ -94,9 +95,8 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
     );
   }
 
-  // --- Lógica de Perfiles ---
+  // --- Lógica de Perfiles (sin cambios) ---
   void _onAddProfile() async {
-    // <<< FIX: `use_build_context_synchronously` --- >>>
     if (!mounted) return;
     final name = await _showInputDialog(
       'Crear Nuevo Perfil',
@@ -113,7 +113,6 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
   }
 
   void _onRenameProfile() async {
-    // <<< FIX: `use_build_context_synchronously` --- >>>
     if (!mounted) return;
     final name = await _showInputDialog(
       'Renombrar Perfil',
@@ -131,14 +130,12 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
   }
 
   void _onDeleteProfile() async {
-    // <<< FIX: `use_build_context_synchronously` --- >>>
     if (!mounted) return;
     final bool? confirmed = await showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Eliminar Perfil'),
         content: Text(
-          // <<< FIX: `unnecessary_brace_in_string_interps` --- >>>
           '¿Seguro que quieres eliminar el perfil "$_perfilActivo"? Esta acción no se puede deshacer.',
         ),
         actions: [
@@ -170,16 +167,14 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
         await _storage.switchProfile(newProfile);
         _loadAllData(widget.currentStatus);
       } catch (e) {
-        // <<< FIX: `use_build_context_synchronously` --- >>>
         if (!mounted) return;
         _showError(e.toString());
       }
     }
   }
 
-  // --- INICIO: LÓGICA DE ESCANEO DUI MODIFICADA ---
+  // --- LÓGICA DE ESCANEO ---
 
-  // Helper para mostrar un Snackbar/Toast que guía al usuario
   void _showScanMessage(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -191,21 +186,16 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
     );
   }
 
-  // Helper para tomar la foto
   Future<XFile?> _pickImage(String prompt) async {
     if (!mounted) return null;
-
-    // Mostrar el prompt
     _showScanMessage(prompt);
-    // Damos tiempo al usuario de leer el mensaje antes de que se abra la cámara
     await Future.delayed(const Duration(milliseconds: 1500));
-
     final ImagePicker picker = ImagePicker();
     return await picker.pickImage(source: ImageSource.camera);
   }
 
+  // Escanear DUI (lógica de dos fotos)
   Future<void> _onScanDUI() async {
-    // 1. Obtener PARTE FRONTAL
     final XFile? frontImage = await _pickImage(
       'Toma foto a la PARTE FRONTAL del DUI',
     );
@@ -214,7 +204,6 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
       return;
     }
 
-    // 2. Obtener PARTE TRASERA
     final XFile? backImage = await _pickImage(
       'Excelente. Ahora toma foto a la PARTE TRASERA',
     );
@@ -224,19 +213,9 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
     }
 
     if (!mounted) return;
-
-    // 3. Mostrar indicador de carga
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const PopScope(
-        canPop: false,
-        child: Center(child: CircularProgressIndicator()),
-      ),
-    );
+    _showLoadingDialog();
 
     try {
-      // 4. Procesar AMBAS imágenes
       final Map<String, String> datosExtraidos = await DuiParser.parseDUI(
         frontImage.path,
         backImage.path,
@@ -245,29 +224,86 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
       if (!mounted) return;
       Navigator.pop(context); // Cierra el indicador de carga
 
-      // 5. Crear un cliente pre-llenado
       final clientePrellenado = Cliente(
-        id: '', // Es un cliente nuevo
+        id: '',
         nombreCliente: datosExtraidos['nombre'] ?? '',
         dui: datosExtraidos['dui'] ?? '',
+        nit: datosExtraidos['nit'] ?? '', // <-- CAMBIO: Añadido NIT
         direccion: datosExtraidos['direccion'] ?? '',
         pais: datosExtraidos['pais'] ?? 'EL SALVADOR',
         departamento: datosExtraidos['departamento'] ?? '',
         municipio: datosExtraidos['municipio'] ?? '',
       );
 
-      // 6. Mostrar el formulario con los datos
-      setState(() {
-        _clienteParaEditar = clientePrellenado;
-        _mostrarFormCliente = true;
-      });
+      _showFormWithData(clientePrellenado);
     } catch (e) {
       if (!mounted) return;
-      Navigator.pop(context); // Cierra el indicador de carga
-      _showError('Error al escanear: ${e.toString()}');
+      Navigator.pop(context);
+      _showError('Error al escanear DUI: ${e.toString()}');
     }
   }
-  // --- FIN: NUEVA LÓGICA DE ESCANEO DUI ---
+
+  // Escanear Pasaporte (lógica de una foto)
+  Future<void> _onScanPasaporte() async {
+    final XFile? image = await _pickImage(
+      'Tome foto a la página principal del PASAPORTE',
+    );
+    if (image == null) {
+      _showMessage('Escaneo cancelado.');
+      return;
+    }
+
+    if (!mounted) return;
+    _showLoadingDialog();
+
+    try {
+      final Map<String, String> datosExtraidos =
+          await PassportParser.parsePassport(image.path);
+
+      if (!mounted) return;
+      Navigator.pop(context);
+
+      final clientePrellenado = Cliente(
+        id: '',
+        nombreCliente: datosExtraidos['nombre'] ?? '',
+        pasaporte: datosExtraidos['pasaporte'] ?? '',
+        pais: datosExtraidos['pais'] ?? '',
+        tipoPersona: 'NATURAL',
+      );
+
+      _showFormWithData(clientePrellenado);
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.pop(context);
+      _showError('Error al escanear Pasaporte: ${e.toString()}');
+    }
+  }
+
+  void _onScanCarnetResidencial() {
+    _showError('Función para escanear Carnet Residencial no implementada.');
+  }
+
+  void _onScanOtroDocumento() {
+    _showError('Función para escanear Otro Documento no implementada.');
+  }
+
+  void _showLoadingDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const PopScope(
+        canPop: false,
+        child: Center(child: CircularProgressIndicator()),
+      ),
+    );
+  }
+
+  void _showFormWithData(Cliente cliente) {
+    setState(() {
+      _clienteParaEditar = cliente;
+      _mostrarFormCliente = true;
+    });
+  }
 
   // --- Lógica de Clientes ---
   void _onSaveCliente(Cliente cliente) async {
@@ -288,7 +324,6 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
   }
 
   void _onDeleteCliente(String id) async {
-    // <<< FIX: `use_build_context_synchronously` --- >>>
     if (!mounted) return;
     final bool? confirmed = await showDialog(
       context: context,
@@ -330,7 +365,6 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
   }
 
   void _onImport() async {
-    // <<< FIX: `use_build_context_synchronously` --- >>>
     if (!mounted) return;
     final jsonToImport = await _showInputDialog(
       'Importar Copia',
@@ -354,9 +388,6 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
     int maxLines = 1,
   }) {
     final controller = TextEditingController(text: initialValue);
-    // <<< FIX: `use_build_context_synchronously` --- >>>
-    // (Asegurarse de que el context de build esté disponible antes de llamar a showDialog)
-    // En este caso, 'context' se pasa desde el 'build' que llama a esta función.
     return showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
@@ -385,7 +416,6 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    // <<< FIX: `MaterialStateProperty` y `withOpacity` obsoletos reemplazados >>>
     final secondaryButtonStyle = OutlinedButton.styleFrom(
       foregroundColor: colorTextoPrincipal.withAlpha(204), // 80% opacity
       side: BorderSide(color: Colors.grey[300]!),
@@ -410,6 +440,7 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // ... (Toda la sección de Gestión de Perfiles no cambia) ...
                       if (widget.currentStatus == ActivationStatus.demo)
                         Container(
                           padding: const EdgeInsets.all(10),
@@ -446,8 +477,6 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
                         style: theme.textTheme.bodyLarge?.copyWith(
                           overflow: TextOverflow.ellipsis,
                         ),
-                        // <<< FIX: `value` obsoleto, reemplazado por `initialValue` o
-                        // `decoration` (aquí 'decoration' es lo correcto) >>>
                         decoration: const InputDecoration(),
                         isExpanded: true,
                       ),
@@ -473,7 +502,6 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
                               icon: Icon(
                                 Icons.delete_outline,
                                 size: 18,
-                                // <<< FIX: `withOpacity` obsoleto >>>
                                 color: dangerColor.withAlpha(
                                   allowWriteActions ? 204 : 102, // 80% o 40%
                                 ),
@@ -481,13 +509,11 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
                               label: Text(
                                 'Eliminar',
                                 style: TextStyle(
-                                  // <<< FIX: `withOpacity` obsoleto >>>
                                   color: dangerColor.withAlpha(
                                     allowWriteActions ? 230 : 102, // 90% o 40%
                                   ),
                                 ),
                               ),
-                              // <<< FIX: `MaterialStateProperty` obsoleto >>>
                               style: ButtonStyle(
                                 foregroundColor:
                                     WidgetStateProperty.resolveWith<Color?>((
@@ -547,7 +573,6 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
                                 size: 18,
                               ),
                               label: const Text('Copia Seg.'),
-                              // <<< FIX: `MaterialStateProperty` obsoleto >>>
                               style: ButtonStyle(
                                 foregroundColor:
                                     WidgetStateProperty.resolveWith<Color?>((
@@ -585,7 +610,6 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
                                 size: 18,
                               ),
                               label: const Text('Importar'),
-                              // <<< FIX: `MaterialStateProperty` obsoleto >>>
                               style: ButtonStyle(
                                 foregroundColor:
                                     WidgetStateProperty.resolveWith<Color?>((
@@ -644,45 +668,53 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
                         Column(
                           key: const ValueKey('botones'),
                           children: [
-                            OutlinedButton.icon(
-                              onPressed: allowWriteActions ? _onScanDUI : null,
-                              icon: const Icon(Icons.camera_alt_outlined),
-                              label: const Text(
-                                'Escanear DUI para autocompletar',
-                              ),
-                              style: OutlinedButton.styleFrom(
-                                minimumSize: const Size(double.infinity, 45),
-                                foregroundColor: colorAzulActivo,
-                                side: const BorderSide(color: colorAzulActivo),
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            SizedBox(
-                              width: double.infinity,
-                              child: ElevatedButton.icon(
-                                onPressed:
-                                    allowWriteActions &&
-                                        (isPro ||
-                                            _clientes.length < kMaxDemoClients)
-                                    ? () {
-                                        setState(() {
-                                          _clienteParaEditar = null;
-                                          _mostrarFormCliente = true;
-                                        });
-                                      }
-                                    : null,
-                                icon: const Icon(Icons.add, size: 20),
-                                label: Text(
-                                  !allowWriteActions
-                                      ? 'Activa la app para agregar clientes'
-                                      : (isPro ||
-                                                _clientes.length <
-                                                    kMaxDemoClients
-                                            ? 'Agregar Nuevo Cliente'
-                                            : 'Límite DEMO alcanzado'),
+                            // --- INICIO: DROPDOWN CON UI CORREGIDA ---
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12.0,
+                                  vertical: 4.0,
+                                ),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(8.0),
+                                  color: colorGrisClaro, // Usa tu color
+                                ),
+                                child: DropdownButton<String>(
+                                  value: _clientType,
+                                  underline: Container(), // Oculta la línea fea
+                                  onChanged: (value) {
+                                    if (value != null) {
+                                      setState(() {
+                                        _clientType = value;
+                                      });
+                                    }
+                                  },
+                                  items: const [
+                                    DropdownMenuItem(
+                                      value: 'El Salvador',
+                                      child: Text('Cliente de El Salvador'),
+                                    ),
+                                    DropdownMenuItem(
+                                      value: 'Extranjero',
+                                      child: Text(
+                                        'Cliente Extranjero / Turista',
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ),
+                            // --- FIN: DROPDOWN CON UI CORREGIDA ---
+                            const SizedBox(height: 16),
+                            if (_clientType == 'El Salvador')
+                              _buildSalvadoranButtons(
+                                allowWriteActions,
+                                isPro,
+                                _clientes.length,
+                              )
+                            else
+                              _buildForeignerButtons(allowWriteActions),
                           ],
                         ),
                   // --- FIN: SECCIÓN DE BOTONES MODIFICADA ---
@@ -699,6 +731,7 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
                         ),
                       )
                     : ListView.builder(
+                        // ... (Resto de la lista de clientes, sin cambios) ...
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
                         itemCount: _clientes.length,
@@ -755,7 +788,6 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
                                   IconButton(
                                     icon: Icon(
                                       Icons.delete_outline,
-                                      // <<< FIX: `withOpacity` obsoleto >>>
                                       color: allowWriteActions
                                           ? colorTextoSecundario
                                           : Colors.grey.withAlpha(128), // 50%
@@ -776,6 +808,107 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
                       ),
               ],
             ),
+    );
+  }
+
+  // --- Widgets de Botones (sin cambios) ---
+
+  /// Construye los botones para "Cliente de El Salvador"
+  Widget _buildSalvadoranButtons(
+    bool allowWriteActions,
+    bool isPro,
+    int clientCount,
+  ) {
+    return Column(
+      children: [
+        OutlinedButton.icon(
+          onPressed: allowWriteActions ? _onScanDUI : null,
+          icon: const Icon(Icons.camera_alt_outlined),
+          label: const Text('Escanear DUI para autocompletar'),
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size(double.infinity, 45),
+            foregroundColor: colorAzulActivo,
+            side: const BorderSide(color: colorAzulActivo),
+          ),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed:
+                allowWriteActions && (isPro || clientCount < kMaxDemoClients)
+                ? () {
+                    setState(() {
+                      _clienteParaEditar = null;
+                      _mostrarFormCliente = true;
+                    });
+                  }
+                : null,
+            icon: const Icon(Icons.add, size: 20),
+            label: Text(
+              !allowWriteActions
+                  ? 'Activa la app para agregar clientes'
+                  : (isPro || clientCount < kMaxDemoClients
+                        ? 'Agregar Nuevo Cliente'
+                        : 'Límite DEMO alcanzado'),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Construye los botones para "Cliente Extranjero"
+  Widget _buildForeignerButtons(bool allowWriteActions) {
+    final buttonStyle = OutlinedButton.styleFrom(
+      minimumSize: const Size(double.infinity, 45),
+      foregroundColor: colorAzulActivo,
+      side: const BorderSide(color: colorAzulActivo),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+    );
+
+    return Column(
+      children: [
+        OutlinedButton.icon(
+          onPressed: allowWriteActions ? _onScanPasaporte : null,
+          icon: const Icon(Icons.contact_mail_outlined),
+          label: const Text('Escanear Pasaporte'),
+          style: buttonStyle,
+        ),
+        const SizedBox(height: 12),
+        OutlinedButton.icon(
+          onPressed: allowWriteActions ? _onScanCarnetResidencial : null,
+          icon: const Icon(Icons.badge_outlined),
+          label: const Text('Escanear Carnet Residencial'),
+          style: buttonStyle,
+        ),
+        const SizedBox(height: 12),
+        OutlinedButton.icon(
+          onPressed: allowWriteActions ? _onScanOtroDocumento : null,
+          icon: const Icon(Icons.description_outlined),
+          label: const Text('Escanear Otro Documento'),
+          style: buttonStyle,
+        ),
+        const SizedBox(height: 16),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: allowWriteActions
+                ? () {
+                    setState(() {
+                      _clienteParaEditar = Cliente(
+                        id: '',
+                        pais: '',
+                      ); // Inicia con país vacío en lugar de 'EL SALVADOR'
+                      _mostrarFormCliente = true;
+                    });
+                  }
+                : null,
+            icon: const Icon(Icons.add, size: 20),
+            label: const Text('Agregar Cliente Manualmente'),
+          ),
+        ),
+      ],
     );
   }
 
