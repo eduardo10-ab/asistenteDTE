@@ -51,6 +51,11 @@ dependencies:
   cloud_functions: ^6.0.4
   cloud_firestore: ^6.1.0
 
+  # --- INICIO: PAQUETES OCR AÑADIDOS ---
+  image_picker: ^1.1.2 # Para cámara y galería
+  google_mlkit_text_recognition: ^0.12.0 # Motor de OCR
+  # --- FIN: PAQUETES OCR AÑADIDOS ---
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

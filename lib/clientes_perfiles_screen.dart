@@ -1,12 +1,18 @@
 // lib/clientes_perfiles_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'dart:async'; // Para Future.delayed
 
 // --- Importaciones ---
 import 'models.dart';
 import 'storage_service.dart';
 import 'cliente_form.dart';
 import 'main.dart'; // Para colores del tema general
+
+// --- INICIO: IMPORTACIONES OCR ---
+import 'package:image_picker/image_picker.dart';
+import 'scan_dui_util.dart';
+// --- FIN: IMPORTACIONES OCR ---
 
 // --- COLORES ESPECÍFICOS ---
 const Color dangerColor = Color(0xFFD9534F);
@@ -170,6 +176,98 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
       }
     }
   }
+
+  // --- INICIO: LÓGICA DE ESCANEO DUI MODIFICADA ---
+
+  // Helper para mostrar un Snackbar/Toast que guía al usuario
+  void _showScanMessage(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message, style: const TextStyle(color: Colors.white)),
+        duration: const Duration(seconds: 2),
+        backgroundColor: Colors.blueAccent,
+      ),
+    );
+  }
+
+  // Helper para tomar la foto
+  Future<XFile?> _pickImage(String prompt) async {
+    if (!mounted) return null;
+
+    // Mostrar el prompt
+    _showScanMessage(prompt);
+    // Damos tiempo al usuario de leer el mensaje antes de que se abra la cámara
+    await Future.delayed(const Duration(milliseconds: 1500));
+
+    final ImagePicker picker = ImagePicker();
+    return await picker.pickImage(source: ImageSource.camera);
+  }
+
+  Future<void> _onScanDUI() async {
+    // 1. Obtener PARTE FRONTAL
+    final XFile? frontImage = await _pickImage(
+      'Toma foto a la PARTE FRONTAL del DUI',
+    );
+    if (frontImage == null) {
+      _showMessage('Escaneo cancelado.');
+      return;
+    }
+
+    // 2. Obtener PARTE TRASERA
+    final XFile? backImage = await _pickImage(
+      'Excelente. Ahora toma foto a la PARTE TRASERA',
+    );
+    if (backImage == null) {
+      _showMessage('Escaneo cancelado.');
+      return;
+    }
+
+    if (!mounted) return;
+
+    // 3. Mostrar indicador de carga
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const PopScope(
+        canPop: false,
+        child: Center(child: CircularProgressIndicator()),
+      ),
+    );
+
+    try {
+      // 4. Procesar AMBAS imágenes
+      final Map<String, String> datosExtraidos = await DuiParser.parseDUI(
+        frontImage.path,
+        backImage.path,
+      );
+
+      if (!mounted) return;
+      Navigator.pop(context); // Cierra el indicador de carga
+
+      // 5. Crear un cliente pre-llenado
+      final clientePrellenado = Cliente(
+        id: '', // Es un cliente nuevo
+        nombreCliente: datosExtraidos['nombre'] ?? '',
+        dui: datosExtraidos['dui'] ?? '',
+        direccion: datosExtraidos['direccion'] ?? '',
+        pais: datosExtraidos['pais'] ?? 'EL SALVADOR',
+        departamento: datosExtraidos['departamento'] ?? '',
+        municipio: datosExtraidos['municipio'] ?? '',
+      );
+
+      // 6. Mostrar el formulario con los datos
+      setState(() {
+        _clienteParaEditar = clientePrellenado;
+        _mostrarFormCliente = true;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.pop(context); // Cierra el indicador de carga
+      _showError('Error al escanear: ${e.toString()}');
+    }
+  }
+  // --- FIN: NUEVA LÓGICA DE ESCANEO DUI ---
 
   // --- Lógica de Clientes ---
   void _onSaveCliente(Cliente cliente) async {
@@ -541,30 +639,53 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
                             });
                           },
                         )
-                      : SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton.icon(
-                            onPressed:
-                                allowWriteActions &&
-                                    (isPro ||
-                                        _clientes.length < kMaxDemoClients)
-                                ? () {
-                                    setState(() {
-                                      _clienteParaEditar = null;
-                                      _mostrarFormCliente = true;
-                                    });
-                                  }
-                                : null,
-                            icon: const Icon(Icons.add, size: 20),
-                            label: Text(
-                              !allowWriteActions
-                                  ? 'Activa la app para agregar clientes'
-                                  : (isPro || _clientes.length < kMaxDemoClients
-                                        ? 'Agregar Nuevo Cliente'
-                                        : 'Límite DEMO alcanzado'),
+                      :
+                        // --- INICIO: SECCIÓN DE BOTONES MODIFICADA ---
+                        Column(
+                          key: const ValueKey('botones'),
+                          children: [
+                            OutlinedButton.icon(
+                              onPressed: allowWriteActions ? _onScanDUI : null,
+                              icon: const Icon(Icons.camera_alt_outlined),
+                              label: const Text(
+                                'Escanear DUI para autocompletar',
+                              ),
+                              style: OutlinedButton.styleFrom(
+                                minimumSize: const Size(double.infinity, 45),
+                                foregroundColor: colorAzulActivo,
+                                side: const BorderSide(color: colorAzulActivo),
+                              ),
                             ),
-                          ),
+                            const SizedBox(height: 12),
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton.icon(
+                                onPressed:
+                                    allowWriteActions &&
+                                        (isPro ||
+                                            _clientes.length < kMaxDemoClients)
+                                    ? () {
+                                        setState(() {
+                                          _clienteParaEditar = null;
+                                          _mostrarFormCliente = true;
+                                        });
+                                      }
+                                    : null,
+                                icon: const Icon(Icons.add, size: 20),
+                                label: Text(
+                                  !allowWriteActions
+                                      ? 'Activa la app para agregar clientes'
+                                      : (isPro ||
+                                                _clientes.length <
+                                                    kMaxDemoClients
+                                            ? 'Agregar Nuevo Cliente'
+                                            : 'Límite DEMO alcanzado'),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
+                  // --- FIN: SECCIÓN DE BOTONES MODIFICADA ---
                 ),
                 const SizedBox(height: 16),
                 _clientes.isEmpty
