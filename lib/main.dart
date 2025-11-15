@@ -326,17 +326,21 @@ class _MainScreenState extends State<MainScreen> {
       },
       child: Scaffold(
         body: IndexedStack(index: _selectedIndex, children: _widgetOptions),
-        floatingActionButton: FloatingActionButton(
-          onPressed: () {
-            if (!context.mounted) return;
-            _mostrarMenuFlotante(
-              context,
-              _webViewController,
-              _reloadActivationStatus,
-            );
-          },
-          child: const Icon(Icons.mode_edit, color: colorBlanco),
-        ),
+        // --- INICIO: CAMBIO EN EL FLOATING ACTION BUTTON ---
+        floatingActionButton: _selectedIndex == 0
+            ? FloatingActionButton(
+                onPressed: () {
+                  if (!context.mounted) return;
+                  _mostrarMenuFlotante(
+                    context,
+                    _webViewController,
+                    _reloadActivationStatus,
+                  );
+                },
+                child: const Icon(Icons.mode_edit, color: colorBlanco),
+              )
+            : null, // No mostrar el botón si no es la pestaña de Inicio
+        // --- FIN: CAMBIO EN EL FLOATING ACTION BUTTON ---
         floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
         bottomNavigationBar: BottomNavigationBar(
           currentIndex: _selectedIndex,
@@ -356,7 +360,7 @@ class _MainScreenState extends State<MainScreen> {
   }
 }
 
-//--- HomeScreen ---
+//--- HomeScreen (Sin cambios) ---
 class HomeScreen extends StatefulWidget {
   final ActivationStatus initialStatus;
   final Function(WebViewController) onWebViewRequested;
@@ -394,9 +398,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     if (Platform.isAndroid) {
-      // Pedir el permiso de almacenamiento antiguo (solo para Android <= 10, maxSdkVersion=29)
-      // Esto solo lo hacemos para que el código no falle en Android antiguo y para que
-      // el Platform Channel se comporte correctamente.
       try {
         var storageStatus = await Permission.storage.status;
         if (storageStatus.isGranted) {
@@ -411,9 +412,6 @@ class _HomeScreenState extends State<HomeScreen> {
           print('Warning: error comprobando Permission.storage: $e');
         }
       }
-
-      // El diálogo de permisos (showDialog) ha sido ELIMINADO permanentemente.
-      // Si el permiso falla, el guardado público nativo (Kotlin) toma el control.
       return false;
     }
     // iOS/Otros: El permiso de storage es una buena práctica
@@ -465,7 +463,6 @@ class _HomeScreenState extends State<HomeScreen> {
       final prefs = await SharedPreferences.getInstance();
       final asked = prefs.getBool('storage_permission_asked') ?? false;
       if (!asked) {
-        // Se llama a la función sin mostrar el diálogo, solo para registrar el estado
         await _requestStoragePermissions();
         await prefs.setBool('storage_permission_asked', true);
       }
@@ -580,7 +577,6 @@ class _HomeScreenState extends State<HomeScreen> {
             } else {
               _showErrorSnackBar('Error: El blob JSON estaba vacío.');
             }
-            // <<< RESTAURADO: Notificación de descarga de JSON (Blob) >>>
             _showMessage('JSON descargado. Se abrirá una ventana para el PDF.');
           } else if (data['action'] == 'openWindow') {
             try {
@@ -630,13 +626,10 @@ class _HomeScreenState extends State<HomeScreen> {
               }
 
               final bytes = base64Decode(base64Data);
-
-              // INICIO: USO DEL NUEVO GUARDADO PÚBLICO
               final String savePath = await _saveFileToDownloadsPublic(
                 bytes,
                 filename,
               );
-              // FIN: USO DEL NUEVO GUARDADO PÚBLICO
 
               if (kDebugMode) {
                 print('[pdfBlob] PDF guardado en: $savePath');
@@ -651,7 +644,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   print('Error solicitando scanFile: $e');
                 }
               }
-              // <<< RESTAURADO: Notificación de descarga de PDF (Blob) >>>
               _showMessage('Archivo PDF guardado en Descargas: $filename');
               try {
                 final res = await OpenFilex.open(savePath);
@@ -768,7 +760,6 @@ class _HomeScreenState extends State<HomeScreen> {
         })();
             ''';
             _controller?.runJavaScript(blobReadScript);
-            // <<< RESTAURADO: Notificación de Procesamiento >>>
             _showMessage('Procesando JSON/PDF...');
             return NavigationDecision.prevent;
           }
@@ -854,17 +845,14 @@ class _HomeScreenState extends State<HomeScreen> {
     String filename,
   ) async {
     try {
-      // Pedimos permiso de almacenamiento (solo relevante para Android < 11)
       await _requestStoragePermissions();
 
       if (Platform.isAndroid) {
-        // USO DEL NUEVO GUARDADO PÚBLICO
         final Uint8List dataBytes = utf8.encode(jsonContent);
         final String savePath = await _saveFileToDownloadsPublic(
           dataBytes,
           filename,
         );
-        // FIN: USO DEL NUEVO GUARDADO PÚBLICO
 
         if (kDebugMode) {
           print('[_handleJsonDataDownload] JSON guardado en: $savePath');
@@ -879,7 +867,6 @@ class _HomeScreenState extends State<HomeScreen> {
             print('Error solicitando scanFile: $e');
           }
         }
-        // <<< RESTAURADO: Notificación de descarga de JSON (SnackBar) >>>
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -889,7 +876,6 @@ class _HomeScreenState extends State<HomeScreen> {
           );
         }
       } else {
-        // Lógica de guardado anterior para iOS/Otros
         final directory = await getApplicationDocumentsDirectory();
         final String savePath = '${directory.path}/$filename';
         final File file = File(savePath);
@@ -931,8 +917,6 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       await _requestStoragePermissions();
 
-      // La creación de la carpeta local ya no es necesaria, MediaStore lo maneja.
-
       final String originalFileName = uri.pathSegments.isNotEmpty
           ? uri.pathSegments.last
                 .split('?')
@@ -942,7 +926,6 @@ class _HomeScreenState extends State<HomeScreen> {
       final String timestamp = DateTime.now().millisecondsSinceEpoch.toString();
       final String fileName = '${timestamp}_$originalFileName';
 
-      // Descargamos el archivo a un directorio temporal interno primero
       final Directory tempDir = await getTemporaryDirectory();
       final String tempPath = '${tempDir.path}/$fileName';
 
@@ -960,18 +943,14 @@ class _HomeScreenState extends State<HomeScreen> {
         },
       );
 
-      // Leemos los bytes del archivo temporal
       final File tempFile = File(tempPath);
       final Uint8List fileBytes = await tempFile.readAsBytes();
 
-      // INICIO: USO DEL NUEVO GUARDADO PÚBLICO
       final String savePath = await _saveFileToDownloadsPublic(
         fileBytes,
         fileName,
       );
-      // FIN: USO DEL NUEVO GUARDADO PÚBLICO
 
-      // Eliminamos el archivo temporal
       await tempFile.delete();
 
       try {
@@ -983,7 +962,6 @@ class _HomeScreenState extends State<HomeScreen> {
         }
       }
 
-      // <<< RESTAURADO: Notificación de descarga de PDF (URL) >>>
       _showMessage('Archivo PDF guardado en Descargas: $fileName');
 
       final result = await OpenFilex.open(savePath);
@@ -1059,7 +1037,6 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       await _requestStoragePermissions();
 
-      // Descargamos el archivo a un directorio temporal interno primero
       final Directory tempDir = await getTemporaryDirectory();
       final String tempPath = '${tempDir.path}/$fileName';
 
@@ -1076,18 +1053,14 @@ class _HomeScreenState extends State<HomeScreen> {
         },
       );
 
-      // Leemos los bytes del archivo temporal
       final File tempFile = File(tempPath);
       final Uint8List fileBytes = await tempFile.readAsBytes();
 
-      // INICIO: USO DEL NUEVO GUARDADO PÚBLICO
       final String savePath = await _saveFileToDownloadsPublic(
         fileBytes,
         fileName,
       );
-      // FIN: USO DEL NUEVO GUARDADO PÚBLICO
 
-      // Eliminamos el archivo temporal
       await tempFile.delete();
 
       try {
@@ -1099,7 +1072,6 @@ class _HomeScreenState extends State<HomeScreen> {
         }
       }
 
-      // <<< RESTAURADO: Notificación de descarga de Archivo General >>>
       if (mounted) {
         if (url.endsWith('.pdf')) {
           _showMessage('Archivo PDF guardado en Descargas: $fileName');
@@ -1161,9 +1133,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _showMessage('Versión DEMO activada.');
       }
     } catch (e) {
-      _showError(
-        e.toString(),
-      ); // Muestra el mensaje exacto de la Cloud Function
+      _showError(e.toString());
     } finally {
       if (mounted) {
         setState(() => _isActivating = false);
@@ -1239,7 +1209,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   child: Chip(
                     label: Text(
-                      // <<<--- CAMBIO: Usando la nueva propiedad --- >>>
                       _activationStatus.chipLabel,
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
@@ -1296,10 +1265,6 @@ class _HomeScreenState extends State<HomeScreen> {
       children: [
         const SizedBox(height: 16.0),
         _buildGreeting(),
-        // <<<--- INICIO: BOTÓN DE TUTORIAL ELIMINADO --- >>>
-        // const SizedBox(height: 32),
-        // _buildButtons(context),
-        // <<<--- FIN: BOTÓN DE TUTORIAL ELIMINADO --- >>>
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 24.0),
           child: Divider(color: Colors.grey[300], height: 1),
@@ -1385,8 +1350,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // <<<--- MÉTODO _buildButtons ELIMINADO --- >>>
-
   Widget _buildActivationSection() {
     final theme = Theme.of(context);
     return Card(
@@ -1401,7 +1364,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 16),
             Text(
-              // <<<--- CAMBIO: Usando la nueva propiedad --- >>>
               'Estado actual: ${_activationStatus.chipLabel}',
               style: theme.textTheme.bodyMedium?.copyWith(
                 fontSize: 16,
@@ -1540,8 +1502,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 }
-
-// <<<--- CLASE BlankPageWithNav ELIMINADA --- >>>
 
 // --- FUNCIÓN GLOBAL _mostrarMenuFlotante ---
 void _mostrarMenuFlotante(

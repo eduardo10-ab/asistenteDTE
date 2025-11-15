@@ -194,7 +194,6 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
     return await picker.pickImage(source: ImageSource.camera);
   }
 
-  // Escanear DUI (lógica de dos fotos)
   Future<void> _onScanDUI() async {
     final XFile? frontImage = await _pickImage(
       'Toma foto a la PARTE FRONTAL del DUI',
@@ -228,7 +227,7 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
         id: '',
         nombreCliente: datosExtraidos['nombre'] ?? '',
         dui: datosExtraidos['dui'] ?? '',
-        nit: datosExtraidos['nit'] ?? '', // <-- CAMBIO: Añadido NIT
+        nit: datosExtraidos['nit'] ?? '', // <-- Se mantiene el NIT
         direccion: datosExtraidos['direccion'] ?? '',
         pais: datosExtraidos['pais'] ?? 'EL SALVADOR',
         departamento: datosExtraidos['departamento'] ?? '',
@@ -243,7 +242,6 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
     }
   }
 
-  // Escanear Pasaporte (lógica de una foto)
   Future<void> _onScanPasaporte() async {
     final XFile? image = await _pickImage(
       'Tome foto a la página principal del PASAPORTE',
@@ -669,40 +667,46 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
                           key: const ValueKey('botones'),
                           children: [
                             // --- INICIO: DROPDOWN CON UI CORREGIDA ---
-                            Align(
-                              alignment: Alignment.centerLeft,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12.0,
-                                  vertical: 4.0,
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12.0,
+                                vertical: 4.0,
+                              ),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(8.0),
+                                // Usamos el color de fondo del tema
+                                color: Theme.of(
+                                  context,
+                                ).inputDecorationTheme.fillColor,
+                                border: Border.all(
+                                  color: Theme.of(context)
+                                      .inputDecorationTheme
+                                      .enabledBorder!
+                                      .borderSide
+                                      .color,
                                 ),
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(8.0),
-                                  color: colorGrisClaro, // Usa tu color
-                                ),
-                                child: DropdownButton<String>(
-                                  value: _clientType,
-                                  underline: Container(), // Oculta la línea fea
-                                  onChanged: (value) {
-                                    if (value != null) {
-                                      setState(() {
-                                        _clientType = value;
-                                      });
-                                    }
-                                  },
-                                  items: const [
-                                    DropdownMenuItem(
-                                      value: 'El Salvador',
-                                      child: Text('Cliente de El Salvador'),
-                                    ),
-                                    DropdownMenuItem(
-                                      value: 'Extranjero',
-                                      child: Text(
-                                        'Cliente Extranjero / Turista',
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                              ),
+                              child: DropdownButton<String>(
+                                value: _clientType,
+                                underline: Container(), // Oculta la línea fea
+                                isExpanded: true, // <-- HACE QUE OCUPE EL ANCHO
+                                onChanged: (value) {
+                                  if (value != null) {
+                                    setState(() {
+                                      _clientType = value;
+                                    });
+                                  }
+                                },
+                                items: const [
+                                  DropdownMenuItem(
+                                    value: 'El Salvador',
+                                    child: Text('Cliente de El Salvador'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'Extranjero',
+                                    child: Text('Cliente Extranjero / Turista'),
+                                  ),
+                                ],
                               ),
                             ),
                             // --- FIN: DROPDOWN CON UI CORREGIDA ---
@@ -720,6 +724,7 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
                   // --- FIN: SECCIÓN DE BOTONES MODIFICADA ---
                 ),
                 const SizedBox(height: 16),
+                // --- INICIO: LISTA DE CLIENTES MODIFICADA ---
                 _clientes.isEmpty
                     ? Center(
                         child: Padding(
@@ -731,13 +736,17 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
                         ),
                       )
                     : ListView.builder(
-                        // ... (Resto de la lista de clientes, sin cambios) ...
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
                         itemCount: _clientes.length,
                         itemBuilder: (context, index) {
                           final cliente = _clientes[index];
                           return InkWell(
+                            // --- CAMBIO: AÑADIDO onLongPress ---
+                            onLongPress: allowWriteActions
+                                ? () => _onDeleteCliente(cliente.id)
+                                : null,
+                            // --- FIN CAMBIO ---
                             onTap: allowWriteActions
                                 ? () {
                                     setState(() {
@@ -806,6 +815,7 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
                           );
                         },
                       ),
+                // --- FIN: LISTA DE CLIENTES MODIFICADA ---
               ],
             ),
     );
