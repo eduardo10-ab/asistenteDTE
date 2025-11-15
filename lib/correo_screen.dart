@@ -1,10 +1,14 @@
 // lib/correo_screen.dart
-import 'package:flutter/foundation.dart'; // <<< AÑADIDO PARA kDebugMode
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'models.dart';
 import 'storage_service.dart';
-import 'main.dart'; // Para los colores
+// import 'main.dart'; // <--- Eliminado, ya no se necesitan los colores
+
+// --- Colores de Marca (Añadidos para que el archivo compile) ---
+const Color colorCelestePastel = Color(0xFF80D8FF);
+const Color colorAzulActivo = Color(0xFF40C4FF);
 
 class CorreoScreen extends StatefulWidget {
   final ActivationStatus currentStatus;
@@ -90,7 +94,6 @@ class CorreoScreenState extends State<CorreoScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _isLoading = false);
-      // <<< FIX: `print` reemplazado por `kDebugMode` >>>
       if (kDebugMode) {
         print("Error cargando datos en CorreoScreen: $e");
       }
@@ -142,7 +145,8 @@ Saludos.
     final theme = Theme.of(context);
 
     return Scaffold(
-      backgroundColor: colorBlanco,
+      // --- CAMBIO: 'backgroundColor' eliminado ---
+      // backgroundColor: colorBlanco,
       appBar: AppBar(title: const Text('Correo')),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -178,9 +182,14 @@ Saludos.
                     controller: _searchController,
                     decoration: InputDecoration(
                       hintText: 'Buscar cliente...',
-                      prefixIcon: const Icon(Icons.search, color: Colors.grey),
+                      // --- CAMBIO: Se usa color del tema ---
+                      prefixIcon: Icon(
+                        Icons.search,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
                       filled: true,
-                      fillColor: colorGrisClaro,
+                      // --- CAMBIO: Se usa color del tema ---
+                      fillColor: theme.cardColor,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide: BorderSide.none,
@@ -214,13 +223,12 @@ Saludos.
   }
 
   Widget _buildProfileSection(ThemeData theme) {
+    // Los colores de marca (azul) están bien
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        // <<< FIX: `withOpacity` reemplazado por `withAlpha` (10% = 26) >>>
         color: colorCelestePastel.withAlpha(26),
         borderRadius: BorderRadius.circular(12),
-        // <<< FIX: `withOpacity` reemplazado por `withAlpha` (30% = 77) >>>
         border: Border.all(color: colorCelestePastel.withAlpha(77)),
       ),
       child: Row(
@@ -260,14 +268,17 @@ Saludos.
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        // <<< FIX: `withOpacity` reemplazado por `withAlpha` (50% = 128) >>>
-        color: colorGrisClaro.withAlpha(128),
+        // --- CAMBIO: Se usa color del tema ---
+        color: theme.cardColor.withAlpha(128),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Center(
         child: Text(
           message,
-          style: theme.textTheme.bodyMedium?.copyWith(color: Colors.grey),
+          // --- CAMBIO: Se usa color del tema ---
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
           textAlign: TextAlign.center,
         ),
       ),
@@ -278,7 +289,8 @@ Saludos.
     return Card(
       key: ValueKey(cliente.id),
       elevation: 0,
-      color: colorGrisClaro,
+      // --- CAMBIO: Se usa color del tema ---
+      color: theme.cardColor,
       margin: const EdgeInsets.only(bottom: 8),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: InkWell(
@@ -306,7 +318,8 @@ Saludos.
                       Text(
                         cliente.email,
                         style: theme.textTheme.bodyMedium?.copyWith(
-                          color: colorTextoSecundario,
+                          // --- CAMBIO: Se usa color del tema ---
+                          color: theme.colorScheme.onSurfaceVariant,
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -318,12 +331,13 @@ Saludos.
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: colorBlanco,
+                  // --- CAMBIO: Se usa color del tema ---
+                  color: theme.colorScheme.background,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Icon(
                   Icons.mail_outline_rounded,
-                  color: colorAzulActivo,
+                  color: colorAzulActivo, // Color de marca está bien
                   size: 24,
                 ),
               ),

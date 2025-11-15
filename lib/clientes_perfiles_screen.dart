@@ -7,7 +7,7 @@ import 'dart:async'; // Para Future.delayed
 import 'models.dart';
 import 'storage_service.dart';
 import 'cliente_form.dart';
-import 'main.dart'; // Para colores del tema general
+// import 'main.dart'; // <--- Eliminado
 
 // --- INICIO: IMPORTACIONES OCR ---
 import 'package:image_picker/image_picker.dart';
@@ -15,11 +15,16 @@ import 'scan_dui_util.dart'; // El que ya teníamos
 import 'scan_passport_util.dart'; // El parser de pasaportes
 // --- FIN: IMPORTACIONES OCR ---
 
-// --- COLORES ESPECÍFICOS ---
+// --- COLORES ESPECÍFICOS (Semánticos, están bien) ---
 const Color dangerColor = Color(0xFFD9534F);
 const Color warningColor = Color(0xFFF0AD4E);
 const Color successColor = Color(0xFF28a745);
 const Color tealColor = Colors.teal;
+
+// --- INICIO: COLORES DE MARCA AÑADIDOS ---
+const Color colorCelestePastel = Color(0xFF80D8FF);
+const Color colorAzulActivo = Color(0xFF40C4FF);
+// --- FIN: COLORES DE MARCA AÑADIDOS ---
 
 class ClientesPerfilesScreen extends StatefulWidget {
   final ActivationStatus currentStatus;
@@ -227,7 +232,7 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
         id: '',
         nombreCliente: datosExtraidos['nombre'] ?? '',
         dui: datosExtraidos['dui'] ?? '',
-        nit: datosExtraidos['nit'] ?? '', // <-- Se mantiene el NIT
+        nit: datosExtraidos['nit'] ?? '',
         direccion: datosExtraidos['direccion'] ?? '',
         pais: datosExtraidos['pais'] ?? 'EL SALVADOR',
         departamento: datosExtraidos['departamento'] ?? '',
@@ -415,8 +420,10 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final secondaryButtonStyle = OutlinedButton.styleFrom(
-      foregroundColor: colorTextoPrincipal.withAlpha(204), // 80% opacity
-      side: BorderSide(color: Colors.grey[300]!),
+      foregroundColor: theme.colorScheme.onSurface.withAlpha(
+        204,
+      ), // 80% opacity
+      side: BorderSide(color: theme.dividerColor),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       textStyle: const TextStyle(fontWeight: FontWeight.w500),
@@ -426,7 +433,6 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
     final bool isPro = widget.currentStatus == ActivationStatus.pro;
 
     return Scaffold(
-      backgroundColor: colorBlanco,
       appBar: AppBar(title: const Text('Clientes y Perfiles')),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -438,7 +444,6 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // ... (Toda la sección de Gestión de Perfiles no cambia) ...
                       if (widget.currentStatus == ActivationStatus.demo)
                         Container(
                           padding: const EdgeInsets.all(10),
@@ -661,12 +666,9 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
                             });
                           },
                         )
-                      :
-                        // --- INICIO: SECCIÓN DE BOTONES MODIFICADA ---
-                        Column(
+                      : Column(
                           key: const ValueKey('botones'),
                           children: [
-                            // --- INICIO: DROPDOWN CON UI CORREGIDA ---
                             Container(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 12.0,
@@ -674,12 +676,9 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
                               ),
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(8.0),
-                                // Usamos el color de fondo del tema
-                                color: Theme.of(
-                                  context,
-                                ).inputDecorationTheme.fillColor,
+                                color: theme.inputDecorationTheme.fillColor,
                                 border: Border.all(
-                                  color: Theme.of(context)
+                                  color: theme
                                       .inputDecorationTheme
                                       .enabledBorder!
                                       .borderSide
@@ -688,13 +687,12 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
                               ),
                               child: DropdownButton<String>(
                                 value: _clientType,
-                                underline: Container(), // Oculta la línea fea
-                                isExpanded: true, // <-- HACE QUE OCUPE EL ANCHO
+                                underline: Container(),
+                                isExpanded: true,
+                                dropdownColor: theme.cardColor,
                                 onChanged: (value) {
                                   if (value != null) {
-                                    setState(() {
-                                      _clientType = value;
-                                    });
+                                    setState(() => _clientType = value);
                                   }
                                 },
                                 items: const [
@@ -709,7 +707,6 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
                                 ],
                               ),
                             ),
-                            // --- FIN: DROPDOWN CON UI CORREGIDA ---
                             const SizedBox(height: 16),
                             if (_clientType == 'El Salvador')
                               _buildSalvadoranButtons(
@@ -721,10 +718,8 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
                               _buildForeignerButtons(allowWriteActions),
                           ],
                         ),
-                  // --- FIN: SECCIÓN DE BOTONES MODIFICADA ---
                 ),
                 const SizedBox(height: 16),
-                // --- INICIO: LISTA DE CLIENTES MODIFICADA ---
                 _clientes.isEmpty
                     ? Center(
                         child: Padding(
@@ -742,11 +737,9 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
                         itemBuilder: (context, index) {
                           final cliente = _clientes[index];
                           return InkWell(
-                            // --- CAMBIO: AÑADIDO onLongPress ---
                             onLongPress: allowWriteActions
                                 ? () => _onDeleteCliente(cliente.id)
                                 : null,
-                            // --- FIN CAMBIO ---
                             onTap: allowWriteActions
                                 ? () {
                                     setState(() {
@@ -763,7 +756,7 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
                                 vertical: 12,
                               ),
                               decoration: BoxDecoration(
-                                color: colorGrisClaro,
+                                color: theme.cardColor,
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Row(
@@ -798,8 +791,8 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
                                     icon: Icon(
                                       Icons.delete_outline,
                                       color: allowWriteActions
-                                          ? colorTextoSecundario
-                                          : Colors.grey.withAlpha(128), // 50%
+                                          ? theme.colorScheme.onSurfaceVariant
+                                          : theme.disabledColor,
                                       size: 20,
                                     ),
                                     onPressed: allowWriteActions
@@ -815,15 +808,12 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
                           );
                         },
                       ),
-                // --- FIN: LISTA DE CLIENTES MODIFICADA ---
               ],
             ),
     );
   }
 
   // --- Widgets de Botones (sin cambios) ---
-
-  /// Construye los botones para "Cliente de El Salvador"
   Widget _buildSalvadoranButtons(
     bool allowWriteActions,
     bool isPro,
@@ -868,7 +858,6 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
     );
   }
 
-  /// Construye los botones para "Cliente Extranjero"
   Widget _buildForeignerButtons(bool allowWriteActions) {
     final buttonStyle = OutlinedButton.styleFrom(
       minimumSize: const Size(double.infinity, 45),

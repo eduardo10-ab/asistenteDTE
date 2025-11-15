@@ -8,7 +8,11 @@ import 'dart:convert'; // Para jsonEncode
 import 'js_injection.dart';
 import 'models.dart';
 import 'storage_service.dart';
-import 'main.dart'; // Importa main.dart para colores del tema
+// import 'main.dart'; // <--- ELIMINADO
+
+// --- COLORES DE MARCA AÑADIDOS ---
+const Color colorCelestePastel = Color(0xFF80D8FF);
+const Color colorAzulActivo = Color(0xFF40C4FF);
 
 class MenuFlotanteWidget extends StatefulWidget {
   final WebViewController? webViewController;
@@ -52,22 +56,15 @@ class _MenuFlotanteWidgetState extends State<MenuFlotanteWidget> {
     });
   }
 
-  // Inyecta el cliente seleccionado
   void _inyectarClienteEspecifico(Cliente cliente) {
     if (!_puedeInyectar) return;
-
-    // <<<--- INICIO: GUARDAR CLIENTE RECIENTE --- >>>
-    // Guarda el ID de este cliente como el "último facturado"
     _storage.setLastInvoicedClientId(cliente.id);
-    // <<<--- FIN: GUARDAR CLIENTE RECIENTE --- >>>
-
     final clienteJson = jsonEncode(cliente.toJson());
     widget.webViewController!.runJavaScript(jsInjector);
     widget.webViewController!.runJavaScript('fillClientData($clienteJson);');
     Navigator.pop(context); // Cierra el modal
   }
 
-  // Inyecta el producto seleccionado
   void _inyectarProductoEspecifico(Producto producto) {
     if (!_puedeInyectar) return;
     final productoJson = jsonEncode(producto.toJson());
@@ -80,14 +77,17 @@ class _MenuFlotanteWidgetState extends State<MenuFlotanteWidget> {
 
   @override
   Widget build(BuildContext context) {
-    // Calcula padding inferior (sin cambios)
+    // --- INICIO: SE USAN COLORES DEL TEMA ---
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    // --- FIN: SE USAN COLORES DEL TEMA ---
+
     const double fabHeight = 152.0;
     const double desiredBottomMargin = 8.0;
     final double bottomPadding =
         fabHeight + desiredBottomMargin + MediaQuery.of(context).padding.bottom;
 
     return Padding(
-      // Padding ajustado (sin cambios)
       padding: EdgeInsets.fromLTRB(136, 16, 1, bottomPadding),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -98,7 +98,8 @@ class _MenuFlotanteWidgetState extends State<MenuFlotanteWidget> {
           Container(
             width: 250,
             decoration: BoxDecoration(
-              color: colorBlanco,
+              // --- CAMBIO: Se usa color del tema ---
+              color: colorScheme.background,
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
@@ -117,23 +118,23 @@ class _MenuFlotanteWidgetState extends State<MenuFlotanteWidget> {
                     )
                   : AnimatedSwitcher(
                       duration: const Duration(milliseconds: 200),
-                      // El child cambia basado en la variable de estado
                       child: _mostrandoListaClientes
-                          ? _buildListaClientes()
+                          ? _buildListaClientes(theme)
                           : _mostrandoListaProductos
-                          ? _buildListaProductos()
-                          : _buildMenuPrincipal(),
+                          ? _buildListaProductos(theme)
+                          : _buildMenuPrincipal(theme),
                     ),
             ),
           ),
           const SizedBox(height: 16),
 
-          // --- Botón de Cerrar (X) (Sin cambios) ---
+          // --- Botón de Cerrar (X) ---
           FloatingActionButton(
             mini: true,
             onPressed: () => Navigator.pop(context),
-            backgroundColor: colorBlanco,
-            foregroundColor: colorTextoPrincipal,
+            // --- CAMBIO: Se usa color del tema ---
+            backgroundColor: colorScheme.background,
+            foregroundColor: colorScheme.onBackground,
             elevation: 2,
             tooltip: 'Cerrar',
             child: const Icon(Icons.close),
@@ -143,12 +144,12 @@ class _MenuFlotanteWidgetState extends State<MenuFlotanteWidget> {
     );
   }
 
-  /// Muestra los botones de acción principales (Sin cambios)
-  Widget _buildMenuPrincipal() {
+  Widget _buildMenuPrincipal(ThemeData theme) {
     return Column(
-      key: const ValueKey('menu_principal'), // Key para el AnimatedSwitcher
+      key: const ValueKey('menu_principal'),
       children: [
         _buildMenuButton(
+          theme,
           'Rellenar Cliente',
           Icons.person_add_alt_1,
           (_puedeInyectar && _clientes.isNotEmpty)
@@ -159,9 +160,15 @@ class _MenuFlotanteWidgetState extends State<MenuFlotanteWidget> {
                 }
               : null,
         ),
-        Divider(height: 1, color: colorGrisClaro, indent: 16, endIndent: 16),
-
+        // --- CAMBIO: Se usa color del tema ---
+        Divider(
+          height: 1,
+          color: theme.dividerColor,
+          indent: 16,
+          endIndent: 16,
+        ),
         _buildMenuButton(
+          theme,
           'Agregar Ítem',
           Icons.add_shopping_cart,
           (_puedeInyectar && _productos.isNotEmpty)
@@ -176,10 +183,9 @@ class _MenuFlotanteWidgetState extends State<MenuFlotanteWidget> {
     );
   }
 
-  /// Muestra un ListView de clientes seleccionables (Sin cambios)
-  Widget _buildListaClientes() {
+  Widget _buildListaClientes(ThemeData theme) {
     return ConstrainedBox(
-      key: const ValueKey('lista_clientes'), // Key para el AnimatedSwitcher
+      key: const ValueKey('lista_clientes'),
       constraints: BoxConstraints(
         maxHeight: MediaQuery.of(context).size.height * 0.4,
       ),
@@ -204,14 +210,21 @@ class _MenuFlotanteWidgetState extends State<MenuFlotanteWidget> {
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
-                      color: colorTextoPrincipal,
+                      // --- CAMBIO: Se usa color del tema ---
+                      color: theme.colorScheme.onBackground,
                     ),
                   ),
                 ],
               ),
             ),
           ),
-          Divider(height: 1, color: colorGrisClaro, indent: 0, endIndent: 0),
+          // --- CAMBIO: Se usa color del tema ---
+          Divider(
+            height: 1,
+            color: theme.dividerColor,
+            indent: 0,
+            endIndent: 0,
+          ),
 
           // 2. Lista de Clientes (Scrollable)
           Flexible(
@@ -237,7 +250,8 @@ class _MenuFlotanteWidgetState extends State<MenuFlotanteWidget> {
                           : '(Cliente sin nombre)',
                       style: TextStyle(
                         fontSize: 15,
-                        color: colorTextoPrincipal,
+                        // --- CAMBIO: Se usa color del tema ---
+                        color: theme.colorScheme.onBackground,
                       ),
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -251,10 +265,9 @@ class _MenuFlotanteWidgetState extends State<MenuFlotanteWidget> {
     );
   }
 
-  /// Muestra un ListView de productos seleccionables (Sin cambios)
-  Widget _buildListaProductos() {
+  Widget _buildListaProductos(ThemeData theme) {
     return ConstrainedBox(
-      key: const ValueKey('lista_productos'), // Key para el AnimatedSwitcher
+      key: const ValueKey('lista_productos'),
       constraints: BoxConstraints(
         maxHeight: MediaQuery.of(context).size.height * 0.4,
       ),
@@ -279,14 +292,21 @@ class _MenuFlotanteWidgetState extends State<MenuFlotanteWidget> {
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
-                      color: colorTextoPrincipal,
+                      // --- CAMBIO: Se usa color del tema ---
+                      color: theme.colorScheme.onBackground,
                     ),
                   ),
                 ],
               ),
             ),
           ),
-          Divider(height: 1, color: colorGrisClaro, indent: 0, endIndent: 0),
+          // --- CAMBIO: Se usa color del tema ---
+          Divider(
+            height: 1,
+            color: theme.dividerColor,
+            indent: 0,
+            endIndent: 0,
+          ),
 
           // 2. Lista de Productos (Scrollable)
           Flexible(
@@ -312,7 +332,8 @@ class _MenuFlotanteWidgetState extends State<MenuFlotanteWidget> {
                           : '(Producto sin nombre)',
                       style: TextStyle(
                         fontSize: 15,
-                        color: colorTextoPrincipal,
+                        // --- CAMBIO: Se usa color del tema ---
+                        color: theme.colorScheme.onBackground,
                       ),
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -326,8 +347,12 @@ class _MenuFlotanteWidgetState extends State<MenuFlotanteWidget> {
     );
   }
 
-  // --- WIDGET DE BOTÓN (Sin cambios) ---
-  Widget _buildMenuButton(String text, IconData icon, VoidCallback? onPressed) {
+  Widget _buildMenuButton(
+    ThemeData theme,
+    String text,
+    IconData icon,
+    VoidCallback? onPressed,
+  ) {
     final bool isEnabled = onPressed != null;
 
     String displayText = text;
@@ -347,11 +372,14 @@ class _MenuFlotanteWidgetState extends State<MenuFlotanteWidget> {
           children: [
             CircleAvatar(
               radius: 18,
-              backgroundColor: colorGrisClaro,
+              // --- CAMBIO: Se usa color del tema ---
+              backgroundColor: theme.cardColor,
               child: Icon(
                 icon,
                 size: 20,
-                color: isEnabled ? colorCelestePastel : Colors.grey[400],
+                color: isEnabled
+                    ? colorCelestePastel
+                    : theme.disabledColor, // Color de marca vs deshabilitado
               ),
             ),
             const SizedBox(width: 20),
@@ -361,7 +389,10 @@ class _MenuFlotanteWidgetState extends State<MenuFlotanteWidget> {
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
-                  color: isEnabled ? colorTextoPrincipal : colorTextoSecundario,
+                  // --- CAMBIO: Se usa color del tema ---
+                  color: isEnabled
+                      ? theme.colorScheme.onBackground
+                      : theme.disabledColor,
                 ),
                 overflow: TextOverflow.ellipsis,
               ),

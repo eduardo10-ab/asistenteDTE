@@ -6,12 +6,14 @@ import 'package:flutter/services.dart';
 import 'models.dart';
 import 'storage_service.dart';
 import 'app_data.dart'; // Para kUnidadesMedida
-import 'main.dart'; // Para colores del tema general
+// import 'main.dart'; // <--- Eliminado, ya no se necesitan los colores
 
-// --- COLORES ESPECÍFICOS ---
+// --- COLORES ESPECÍFICOS (Semánticos, están bien) ---
 const Color dangerColor = Color(0xFFD9534F);
 const Color warningColor = Color(0xFFF0AD4E);
 const Color successColor = Color(0xFF28a745);
+const Color colorCelestePastel = Color(0xFF80D8FF); // <-- Añadido
+const Color colorAzulActivo = Color(0xFF40C4FF); // <-- Añadido
 
 class ProductosScreen extends StatefulWidget {
   final ActivationStatus currentStatus;
@@ -136,7 +138,8 @@ class ProductosScreenState extends State<ProductosScreen> {
         widget.currentStatus != ActivationStatus.none;
 
     return Scaffold(
-      backgroundColor: colorBlanco,
+      // --- CAMBIO: 'backgroundColor' eliminado ---
+      // backgroundColor: colorBlanco,
       appBar: AppBar(title: const Text('Gestionar Productos')),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -215,7 +218,8 @@ class ProductosScreenState extends State<ProductosScreen> {
                                 vertical: 12,
                               ),
                               decoration: BoxDecoration(
-                                color: colorGrisClaro,
+                                // --- CAMBIO: Se usa color del tema ---
+                                color: theme.cardColor,
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Row(
@@ -245,9 +249,10 @@ class ProductosScreenState extends State<ProductosScreen> {
                                   IconButton(
                                     icon: Icon(
                                       Icons.delete_outline,
+                                      // --- CAMBIO: Se usa color del tema ---
                                       color: allowWriteActions
-                                          ? colorTextoSecundario
-                                          : Colors.grey.withAlpha(128),
+                                          ? theme.colorScheme.onSurfaceVariant
+                                          : theme.disabledColor,
                                       size: 20,
                                     ),
                                     onPressed: allowWriteActions
@@ -269,6 +274,7 @@ class ProductosScreenState extends State<ProductosScreen> {
   }
 
   Widget _buildProfileSection(ThemeData theme) {
+    // Los colores de marca (azul) están bien
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -576,24 +582,18 @@ class _ProductoFormState extends State<_ProductoForm> {
     required Function(T?) onChanged,
   }) {
     final theme = Theme.of(context);
-
-    // <<< FIX: `deprecated_member_use` --- >>>
-    // La forma moderna es usar 'initialValue' SI el controlador es nulo,
-    // pero DropdownButtonFormField usa 'value'. El truco es asegurarse
-    // de que 'value' sea null si no está en la lista de 'items'.
     final T? currentValue = (items.any((item) => item.value == value))
         ? value
         : null;
 
     return DropdownButtonFormField<T>(
-      value: currentValue, // Usamos el valor saneado
+      value: currentValue,
       items: items
           .map(
             (item) => DropdownMenuItem<T>(
               value: item.value,
               child: DefaultTextStyle(
                 style: theme.textTheme.bodyLarge ?? const TextStyle(),
-                // <<< FIX: `unnecessary_non_null_assertion` ('!' eliminado) >>>
                 child: item.child,
               ),
             ),
@@ -602,6 +602,8 @@ class _ProductoFormState extends State<_ProductoForm> {
       onChanged: onChanged,
       decoration: InputDecoration(labelText: label),
       isExpanded: true,
+      // --- CAMBIO: Se añade color de fondo del dropdown ---
+      dropdownColor: theme.cardColor,
     );
   }
 }

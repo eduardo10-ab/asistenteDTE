@@ -1,7 +1,7 @@
 // lib/models.dart
 
 import 'package:flutter/material.dart';
-import 'main.dart';
+// import 'main.dart'; // <--- ELIMINADO
 
 // --- CLASES DE LICENCIA ---
 class LicenseKeys {
@@ -13,7 +13,6 @@ enum ActivationStatus {
   demo,
   pro;
 
-  // <<<--- INICIO: NUEVA PROPIEDAD PARA LA CÁPSULA --- >>>
   String get chipLabel {
     switch (this) {
       case ActivationStatus.pro:
@@ -22,10 +21,9 @@ enum ActivationStatus {
         return 'DEMO';
       case ActivationStatus.none:
       default:
-        return 'INACTIVO'; // Aquí está el cambio
+        return 'INACTIVO';
     }
   }
-  // <<<--- FIN: NUEVA PROPIEDAD --- >>>
 
   String get displayName {
     switch (this) {
@@ -58,7 +56,8 @@ enum ActivationStatus {
         return Colors.orange[800] ?? Colors.orange;
       case ActivationStatus.none:
       default:
-        return colorTextoSecundario;
+        // --- CAMBIO: Se usa un color estándar ---
+        return Colors.grey[600] ?? Colors.grey;
     }
   }
 }

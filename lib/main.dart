@@ -24,13 +24,9 @@ import 'storage_service.dart';
 import 'js_injection.dart';
 import 'correo_screen.dart';
 
-// --- Colores ---
-const Color colorBlanco = Colors.white;
+// --- Colores de Marca (Estos se quedan) ---
 const Color colorCelestePastel = Color(0xFF80D8FF);
 const Color colorAzulActivo = Color(0xFF40C4FF);
-const Color colorGrisClaro = Color(0xFFF5F5F5);
-const Color colorTextoPrincipal = Color(0xFF424242);
-const Color colorTextoSecundario = Color(0xFF9E9E9E);
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -44,151 +40,227 @@ class MyApp extends StatelessWidget {
   const MyApp({super.key});
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Facturación App',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: colorCelestePastel,
-          primary: colorCelestePastel,
-          secondary: colorAzulActivo,
-          surface: colorBlanco,
-          onSurface: colorTextoPrincipal,
-          surfaceContainerHighest: colorGrisClaro,
-          onSurfaceVariant: colorTextoPrincipal,
-          onPrimary: colorTextoPrincipal,
-          onSecondary: Colors.white,
-          error: Colors.red[700] ?? Colors.red,
+    // --- INICIO: DEFINICIÓN DE TEMAS ---
+
+    // TEMA CLARO
+    final lightTheme = ThemeData(
+      brightness: Brightness.light,
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: colorCelestePastel,
+        brightness: Brightness.light,
+        primary: colorCelestePastel,
+        secondary: colorAzulActivo,
+        background: const Color(0xFFFFFFFF), // colorBlanco
+        surface: const Color(0xFFF5F5F5), // colorGrisClaro (para Cards)
+        onBackground: const Color(0xFF424242), // colorTextoPrincipal
+        onSurface: const Color(0xFF424242), // colorTextoPrincipal
+        onSurfaceVariant: const Color(0xFF9E9E9E), // colorTextoSecundario
+        onPrimary: const Color(0xFF424242),
+        onSecondary: Colors.white,
+        error: Colors.red[700] ?? Colors.red,
+      ),
+      scaffoldBackgroundColor: const Color(0xFFFFFFFF), // colorBlanco
+      appBarTheme: const AppBarTheme(
+        backgroundColor: Color(0xFFFFFFFF), // colorBlanco
+        foregroundColor: Color(0xFF424242), // colorTextoPrincipal
+        elevation: 1,
+        iconTheme: IconThemeData(color: Color(0xFF424242)),
+        titleTextStyle: TextStyle(
+          color: Color(0xFF424242),
+          fontSize: 24,
+          fontWeight: FontWeight.bold,
         ),
-        scaffoldBackgroundColor: colorBlanco,
-        appBarTheme: const AppBarTheme(
-          backgroundColor: colorBlanco,
-          foregroundColor: colorTextoPrincipal,
-          elevation: 1,
-          iconTheme: IconThemeData(color: colorTextoPrincipal),
-          titleTextStyle: TextStyle(
-            color: colorTextoPrincipal,
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-          ),
+      ),
+      bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+        backgroundColor: Color(0xFFFFFFFF), // colorBlanco
+        elevation: 2,
+        selectedItemColor: colorAzulActivo,
+        unselectedItemColor: Color(0xFF9E9E9E), // colorTextoSecundario
+        selectedLabelStyle: TextStyle(
+          fontWeight: FontWeight.bold,
+          fontSize: 12,
         ),
-        bottomAppBarTheme: const BottomAppBarThemeData(
-          color: colorBlanco,
-          elevation: 2,
+        unselectedLabelStyle: TextStyle(
+          fontWeight: FontWeight.normal,
+          fontSize: 12,
         ),
-        bottomNavigationBarTheme: const BottomNavigationBarThemeData(
-          backgroundColor: colorBlanco,
-          elevation: 2,
-          selectedItemColor: colorAzulActivo,
-          unselectedItemColor: colorTextoSecundario,
-          selectedLabelStyle: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 12,
-          ),
-          unselectedLabelStyle: TextStyle(
-            fontWeight: FontWeight.normal,
-            fontSize: 12,
-          ),
-          type: BottomNavigationBarType.fixed,
-          showUnselectedLabels: true,
-        ),
-        floatingActionButtonTheme: const FloatingActionButtonThemeData(
+        type: BottomNavigationBarType.fixed,
+        showUnselectedLabels: true,
+      ),
+      floatingActionButtonTheme: const FloatingActionButtonThemeData(
+        backgroundColor: colorAzulActivo,
+        foregroundColor: Colors.white, // colorBlanco
+      ),
+      cardTheme: CardThemeData(
+        color: const Color(0xFFF5F5F5), // colorGrisClaro
+        elevation: 0,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.only(bottom: 16),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
           backgroundColor: colorAzulActivo,
-          foregroundColor: colorBlanco,
-        ),
-        cardTheme: CardThemeData(
-          color: colorGrisClaro,
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          margin: const EdgeInsets.only(bottom: 16),
-        ),
-        elevatedButtonTheme: ElevatedButtonThemeData(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: colorAzulActivo,
-            foregroundColor: colorBlanco,
-            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-          ),
-        ),
-        outlinedButtonTheme: OutlinedButtonThemeData(
-          style: OutlinedButton.styleFrom(
-            foregroundColor: colorAzulActivo,
-            side: const BorderSide(color: colorAzulActivo),
-            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-          ),
-        ),
-        inputDecorationTheme: InputDecorationTheme(
-          filled: true,
-          fillColor: colorBlanco,
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 12,
-          ),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(color: Colors.grey[300]!),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(color: Colors.grey[300]!),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: colorAzulActivo, width: 1.5),
-          ),
-          hintStyle: const TextStyle(color: colorTextoSecundario),
-          labelStyle: const TextStyle(color: colorTextoSecundario),
-        ),
-        dropdownMenuTheme: DropdownMenuThemeData(
-          inputDecorationTheme: InputDecorationTheme(
-            filled: true,
-            fillColor: colorBlanco,
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 12,
-            ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.grey[300]!),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(color: Colors.grey[300]!),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: colorAzulActivo, width: 1.5),
-            ),
-          ),
-        ),
-        textTheme: const TextTheme(
-          bodyLarge: TextStyle(color: colorTextoPrincipal, fontSize: 16),
-          bodyMedium: TextStyle(color: colorTextoSecundario, fontSize: 14),
-          titleLarge: TextStyle(
-            color: colorTextoPrincipal,
-            fontWeight: FontWeight.bold,
-            fontSize: 24,
-          ),
-          titleMedium: TextStyle(
-            color: colorTextoPrincipal,
-            fontWeight: FontWeight.w600,
-            fontSize: 18,
-          ),
-        ),
-        chipTheme: ChipThemeData(
-          backgroundColor: colorGrisClaro,
-          labelStyle: const TextStyle(color: colorTextoPrincipal),
-          side: BorderSide.none,
+          foregroundColor: Colors.white, // colorBlanco
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
       ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: colorAzulActivo,
+          side: const BorderSide(color: colorAzulActivo),
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: const Color(0xFFFFFFFF), // colorBlanco
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 12,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: Colors.grey[300]!),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: Colors.grey[300]!),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: colorAzulActivo, width: 1.5),
+        ),
+        hintStyle: const TextStyle(
+          color: Color(0xFF9E9E9E),
+        ), // colorTextoSecundario
+        labelStyle: const TextStyle(
+          color: Color(0xFF9E9E9E),
+        ), // colorTextoSecundario
+      ),
+      textTheme: const TextTheme(
+        bodyLarge: TextStyle(
+          color: Color(0xFF424242),
+          fontSize: 16,
+        ), // colorTextoPrincipal
+        bodyMedium: TextStyle(
+          color: Color(0xFF9E9E9E),
+          fontSize: 14,
+        ), // colorTextoSecundario
+        titleLarge: TextStyle(
+          color: Color(0xFF424242), // colorTextoPrincipal
+          fontWeight: FontWeight.bold,
+          fontSize: 24,
+        ),
+        titleMedium: TextStyle(
+          color: Color(0xFF424242), // colorTextoPrincipal
+          fontWeight: FontWeight.w600,
+          fontSize: 18,
+        ),
+      ),
+      chipTheme: ChipThemeData(
+        backgroundColor: const Color(0xFFF5F5F5), // colorGrisClaro
+        labelStyle: const TextStyle(
+          color: Color(0xFF424242),
+        ), // colorTextoPrincipal
+        side: BorderSide.none,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+    );
+
+    // TEMA OSCURO
+    final darkTheme = ThemeData(
+      brightness: Brightness.dark,
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: colorCelestePastel,
+        brightness: Brightness.dark,
+        primary: colorCelestePastel,
+        secondary: colorAzulActivo,
+        onPrimary: const Color(0xFF424242),
+        onSecondary: Colors.white,
+        error: Colors.red[400] ?? Colors.red,
+      ),
+      appBarTheme: AppBarTheme(
+        elevation: 1,
+        titleTextStyle: TextStyle(
+          fontSize: 24,
+          fontWeight: FontWeight.bold,
+          color: Colors.white.withOpacity(0.9),
+        ),
+      ),
+      bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+        elevation: 2,
+        selectedItemColor: colorAzulActivo,
+        selectedLabelStyle: TextStyle(
+          fontWeight: FontWeight.bold,
+          fontSize: 12,
+        ),
+        unselectedLabelStyle: TextStyle(
+          fontWeight: FontWeight.normal,
+          fontSize: 12,
+        ),
+        type: BottomNavigationBarType.fixed,
+        showUnselectedLabels: true,
+      ),
+      floatingActionButtonTheme: const FloatingActionButtonThemeData(
+        backgroundColor: colorAzulActivo,
+        foregroundColor: Colors.white,
+      ),
+      cardTheme: CardThemeData(
+        elevation: 0,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.only(bottom: 16),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: colorAzulActivo,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: colorAzulActivo,
+          side: const BorderSide(color: colorAzulActivo),
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 12,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: Colors.grey[700]!),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: Colors.grey[700]!),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: colorAzulActivo, width: 1.5),
+        ),
+      ),
+      chipTheme: ChipThemeData(
+        side: BorderSide.none,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+    );
+
+    // --- FIN: DEFINICIÓN DE TEMAS ---
+
+    return MaterialApp(
+      title: 'Facturación App',
+      debugShowCheckedModeBanner: false,
+      theme: lightTheme, // <-- Aplicar tema claro
+      darkTheme: darkTheme, // <-- Aplicar tema oscuro
+      themeMode: ThemeMode.system, // <-- Modo automático
       home: const MainScreen(),
     );
   }
@@ -326,7 +398,6 @@ class _MainScreenState extends State<MainScreen> {
       },
       child: Scaffold(
         body: IndexedStack(index: _selectedIndex, children: _widgetOptions),
-        // --- INICIO: CAMBIO EN EL FLOATING ACTION BUTTON ---
         floatingActionButton: _selectedIndex == 0
             ? FloatingActionButton(
                 onPressed: () {
@@ -337,10 +408,9 @@ class _MainScreenState extends State<MainScreen> {
                     _reloadActivationStatus,
                   );
                 },
-                child: const Icon(Icons.mode_edit, color: colorBlanco),
+                child: const Icon(Icons.mode_edit, color: Colors.white),
               )
-            : null, // No mostrar el botón si no es la pestaña de Inicio
-        // --- FIN: CAMBIO EN EL FLOATING ACTION BUTTON ---
+            : null,
         floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
         bottomNavigationBar: BottomNavigationBar(
           currentIndex: _selectedIndex,
@@ -360,7 +430,7 @@ class _MainScreenState extends State<MainScreen> {
   }
 }
 
-//--- HomeScreen (Sin cambios) ---
+//--- HomeScreen (Ahora dentro de main.dart) ---
 class HomeScreen extends StatefulWidget {
   final ActivationStatus initialStatus;
   final Function(WebViewController) onWebViewRequested;
@@ -391,65 +461,44 @@ class _HomeScreenState extends State<HomeScreen> {
   DateTime? _lastPdfDownloadTime;
   final Duration _pdfCooldown = const Duration(seconds: 5);
 
-  // INICIO: FUNCIÓN DE PERMISOS (SOLO SE ELIMINA EL DIÁLOGO FLOTANTE)
   Future<bool> _requestStoragePermissions() async {
-    if (kDebugMode) {
-      print('Solicitando permisos de almacenamiento...');
-    }
-
+    if (kDebugMode) print('Solicitando permisos de almacenamiento...');
     if (Platform.isAndroid) {
       try {
         var storageStatus = await Permission.storage.status;
-        if (storageStatus.isGranted) {
-          return true;
-        }
+        if (storageStatus.isGranted) return true;
         final storageRequest = await Permission.storage.request();
-        if (storageRequest.isGranted) {
-          return true;
-        }
+        if (storageRequest.isGranted) return true;
       } catch (e) {
-        if (kDebugMode) {
+        if (kDebugMode)
           print('Warning: error comprobando Permission.storage: $e');
-        }
       }
       return false;
     }
-    // iOS/Otros: El permiso de storage es una buena práctica
     var status = await Permission.storage.status;
-    if (!status.isGranted) {
-      status = await Permission.storage.request();
-    }
+    if (!status.isGranted) status = await Permission.storage.request();
     return status.isGranted;
   }
-  // FIN: FUNCIÓN DE PERMISOS
 
-  // INICIO: FUNCIÓN DE GUARDADO PÚBLICO
   Future<String> _saveFileToDownloadsPublic(
     Uint8List data,
     String filename,
   ) async {
     try {
       const platform = MethodChannel('com.facturacion.sv.app_factura/files');
-
       final String? savePath = await platform.invokeMethod('saveToDownloads', {
         'data': data,
         'filename': filename,
       });
-
       if (savePath == null || savePath.isEmpty) {
-        throw Exception(
-          'Error nativo: La ruta de guardado es nula o vacía. ¿Falta implementar Kotlin?',
-        );
+        throw Exception('Error nativo: La ruta de guardado es nula o vacía.');
       }
       return savePath;
     } catch (e) {
-      if (kDebugMode) {
-        print('Error en _saveFileToDownloadsPublic: $e');
-      }
+      if (kDebugMode) print('Error en _saveFileToDownloadsPublic: $e');
       rethrow;
     }
   }
-  // FIN: FUNCIÓN DE GUARDADO PÚBLICO
 
   @override
   void initState() {
@@ -467,9 +516,8 @@ class _HomeScreenState extends State<HomeScreen> {
         await prefs.setBool('storage_permission_asked', true);
       }
     } catch (e) {
-      if (kDebugMode) {
+      if (kDebugMode)
         print('Error comprobando SharedPreferences para permisos: $e');
-      }
     }
   }
 
@@ -483,9 +531,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void didUpdateWidget(covariant HomeScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.initialStatus != oldWidget.initialStatus) {
-      setState(() {
-        _activationStatus = widget.initialStatus;
-      });
+      setState(() => _activationStatus = widget.initialStatus);
     }
   }
 
@@ -496,26 +542,20 @@ class _HomeScreenState extends State<HomeScreen> {
           decoded['identificacion'] is Map) {
         final String? codigo =
             (decoded['identificacion'] as Map)['codigoGeneracion']?.toString();
-        if (codigo != null && codigo.isNotEmpty) {
-          return '$codigo.json';
-        }
+        if (codigo != null && codigo.isNotEmpty) return '$codigo.json';
       }
       final String? codigoRoot = decoded['codigoGeneracion']?.toString();
-      if (codigoRoot != null && codigoRoot.isNotEmpty) {
+      if (codigoRoot != null && codigoRoot.isNotEmpty)
         return '$codigoRoot.json';
-      }
       String cleanFallback = fallbackName.replaceAll('.json', '');
       if (cleanFallback.length == 36 && cleanFallback.contains('-')) {
         return '$cleanFallback.json';
       }
     } catch (e) {
-      if (kDebugMode) {
+      if (kDebugMode)
         print('Error al parsear JSON para buscar nombre de archivo: $e');
-      }
     }
-    if (fallbackName.endsWith('.json')) {
-      return fallbackName;
-    }
+    if (fallbackName.endsWith('.json')) return fallbackName;
     return '$fallbackName.json';
   }
 
@@ -524,23 +564,15 @@ class _HomeScreenState extends State<HomeScreen> {
     await _controller!.addJavaScriptChannel(
       'FlutterChannel',
       onMessageReceived: (JavaScriptMessage message) async {
-        if (kDebugMode) {
-          print('Mensaje recibido de JS: ${message.message}');
-        }
+        if (kDebugMode) print('Mensaje recibido de JS: ${message.message}');
         try {
           final data = jsonDecode(message.message) as Map<String, dynamic>;
 
           if (data['action'] == 'downloadDTE') {
-            if (kDebugMode) {
+            if (kDebugMode)
               print('Acción downloadDTE (interceptor JS) recibida.');
-            }
             if (data['processingStarted'] == true) {
-              if (mounted) {
-                setState(() {
-                  _estaCargando = true;
-                  _isDownloading = false;
-                });
-              }
+              if (mounted) setState(() => _estaCargando = true);
             }
             if (data['data'] != null) {
               final jsonData = data['data'] as Map<String, dynamic>;
@@ -556,15 +588,12 @@ class _HomeScreenState extends State<HomeScreen> {
               }
               if (pdfUrl.isNotEmpty) {
                 await _launchPdfUrl(pdfUrl);
-                if (mounted) {
-                  setState(() => _estaCargando = false);
-                }
+                if (mounted) setState(() => _estaCargando = false);
               }
             }
           } else if (data['action'] == 'downloadFromBlob') {
-            if (kDebugMode) {
+            if (kDebugMode)
               print('Acción downloadFromBlob (lector de blob) recibida.');
-            }
             final String jsonContent = data['jsonContent'] ?? '';
             if (jsonContent.isNotEmpty) {
               final String fallbackName =
@@ -582,9 +611,8 @@ class _HomeScreenState extends State<HomeScreen> {
             try {
               final String url = (data['url'] ?? '').toString();
               if (url.isEmpty || url == 'about:blank') {
-                if (kDebugMode) {
+                if (kDebugMode)
                   print('openWindow ignorado para URL vacía/about:blank');
-                }
                 return;
               }
               final uri = Uri.parse(url);
@@ -594,18 +622,15 @@ class _HomeScreenState extends State<HomeScreen> {
                 _showErrorSnackBar('No se pudo abrir el enlace: $url');
               }
             } catch (e) {
-              if (kDebugMode) {
-                print('Error abriendo ventana desde JS: $e');
-              }
+              if (kDebugMode) print('Error abriendo ventana desde JS: $e');
               _showErrorSnackBar('Error al abrir enlace desde la página.');
             }
           } else if (data['action'] == 'pdfBlob') {
             final now = DateTime.now();
             if (_lastPdfDownloadTime != null &&
                 now.difference(_lastPdfDownloadTime!) < _pdfCooldown) {
-              if (kDebugMode) {
+              if (kDebugMode)
                 print('[pdfBlob] Cooldown: Ignorando descarga duplicada.');
-              }
               return;
             }
             _lastPdfDownloadTime = now;
@@ -631,47 +656,35 @@ class _HomeScreenState extends State<HomeScreen> {
                 filename,
               );
 
-              if (kDebugMode) {
-                print('[pdfBlob] PDF guardado en: $savePath');
-              }
+              if (kDebugMode) print('[pdfBlob] PDF guardado en: $savePath');
               try {
                 const platform = MethodChannel(
                   'com.facturacion.sv.app_factura/files',
                 );
                 await platform.invokeMethod('scanFile', {'path': savePath});
               } catch (e) {
-                if (kDebugMode) {
-                  print('Error solicitando scanFile: $e');
-                }
+                if (kDebugMode) print('Error solicitando scanFile: $e');
               }
               _showMessage('Archivo PDF guardado en Descargas: $filename');
               try {
                 final res = await OpenFilex.open(savePath);
-                if (kDebugMode) {
-                  print('OpenFilex result (pdfBlob): $res');
-                }
+                if (kDebugMode) print('OpenFilex result (pdfBlob): $res');
                 if (res.type != ResultType.done) {
                   throw Exception('No se pudo abrir el PDF');
                 }
               } catch (e) {
-                if (kDebugMode) {
-                  print('Error abriendo PDF con OpenFilex: $e');
-                }
+                if (kDebugMode) print('Error abriendo PDF con OpenFilex: $e');
                 _showErrorSnackBar('Error al abrir el PDF: ${e.toString()}');
               }
             } catch (e) {
-              if (kDebugMode) {
-                print('Error procesando pdfBlob desde JS: $e');
-              }
+              if (kDebugMode) print('Error procesando pdfBlob desde JS: $e');
               _showErrorSnackBar(
                 'Error al procesar PDF recibido: ${e.toString()}',
               );
             }
           }
         } catch (e) {
-          if (kDebugMode) {
-            print('Error procesando mensaje de JS: $e');
-          }
+          if (kDebugMode) print('Error procesando mensaje de JS: $e');
           _showErrorSnackBar('Error procesando datos de la página.');
         }
       },
@@ -681,53 +694,41 @@ class _HomeScreenState extends State<HomeScreen> {
       NavigationDelegate(
         onProgress: (int progress) {},
         onPageStarted: (String url) {
-          if (mounted) {
-            setState(() => _estaCargando = true);
-          }
+          if (mounted) setState(() => _estaCargando = true);
         },
         onPageFinished: (String url) {
-          if (mounted) {
-            setState(() => _estaCargando = false);
-          }
+          if (mounted) setState(() => _estaCargando = false);
           _controller!.runJavaScript(jsInjector);
-          if (kDebugMode) {
-            print("Interceptor JS y helpers inyectados en $url");
-          }
+          if (kDebugMode) print("Interceptor JS y helpers inyectados en $url");
         },
         onWebResourceError: (WebResourceError error) {
-          if (mounted) {
-            setState(() => _estaCargando = false);
-          }
-          if (kDebugMode) {
+          if (mounted) setState(() => _estaCargando = false);
+          if (kDebugMode)
             print('Error al cargar recurso: ${error.description}');
-          }
           _showErrorSnackBar(
             'Error: ${error.description} (Code: ${error.errorCode})',
           );
         },
         onNavigationRequest: (NavigationRequest request) async {
           final String url = request.url;
-          if (kDebugMode) {
+          if (kDebugMode)
             print('NavReq: $url | Main frame: ${request.isMainFrame}');
-          }
           if (url.endsWith('.pdf') ||
               url.endsWith('.zip') ||
               url.endsWith('.doc') ||
               url.endsWith('.docx') ||
               url.endsWith('.xls') ||
               url.endsWith('.xlsx')) {
-            if (kDebugMode) {
+            if (kDebugMode)
               print('Detectada descarga de archivo directo (fallback): $url');
-            }
             _handleFileDownload(url);
             return NavigationDecision.prevent;
           }
           if (url.startsWith('blob:') && request.isMainFrame) {
-            if (kDebugMode) {
+            if (kDebugMode)
               print(
                 'Navegación a JSON/Blob detectada. PREVINIENDO y LEYENDO...',
               );
-            }
             final String blobReadScript =
                 '''
         (async function() {
@@ -765,21 +766,16 @@ class _HomeScreenState extends State<HomeScreen> {
           }
           if (url == 'about:blank' || url.startsWith('javascript:')) {
             if (url == 'about:blank' && !request.isMainFrame) {
-              if (kDebugMode) {
-                print('Permitiendo navegación de pop-up a: $url');
-              }
+              if (kDebugMode) print('Permitiendo navegación de pop-up a: $url');
               return NavigationDecision.navigate;
             }
             if (url == 'about:blank' && request.isMainFrame) {
-              if (kDebugMode) {
+              if (kDebugMode)
                 print('Bloqueando navegación de frame principal a: $url');
-              }
               return NavigationDecision.prevent;
             }
             if (url.startsWith('javascript:')) {
-              if (kDebugMode) {
-                print('Permitiendo navegación interna: $url');
-              }
+              if (kDebugMode) print('Permitiendo navegación interna: $url');
               return NavigationDecision.navigate;
             }
           }
@@ -791,13 +787,11 @@ class _HomeScreenState extends State<HomeScreen> {
           if (!request.isMainFrame &&
               uri.host.isNotEmpty &&
               uri.host != currentHost) {
-            if (kDebugMode) {
+            if (kDebugMode)
               print(
                 'Detectado pop-up a host diferente ($url). Abriendo externamente.',
               );
-            }
             _showMessage('Abriendo enlace externo...');
-
             if (await canLaunchUrl(uri)) {
               await launchUrl(uri, mode: LaunchMode.externalApplication);
             } else {
@@ -805,11 +799,10 @@ class _HomeScreenState extends State<HomeScreen> {
             }
             return NavigationDecision.prevent;
           }
-          if (kDebugMode) {
+          if (kDebugMode)
             print(
               'Navegación normal permitida (isMainFrame: ${request.isMainFrame}, host: ${uri.host}).',
             );
-          }
           return NavigationDecision.navigate;
         },
       ),
@@ -822,13 +815,9 @@ class _HomeScreenState extends State<HomeScreen> {
         Uri.parse('https://admin.factura.gob.sv/login'),
       );
     } catch (e) {
-      if (kDebugMode) {
-        print("Error cargando URL inicial: $e");
-      }
+      if (kDebugMode) print("Error cargando URL inicial: $e");
       _showErrorSnackBar("No se pudo cargar la página inicial.");
-      if (mounted) {
-        setState(() => _estaCargando = false);
-      }
+      if (mounted) setState(() => _estaCargando = false);
     }
   }
 
@@ -846,26 +835,21 @@ class _HomeScreenState extends State<HomeScreen> {
   ) async {
     try {
       await _requestStoragePermissions();
-
       if (Platform.isAndroid) {
         final Uint8List dataBytes = utf8.encode(jsonContent);
         final String savePath = await _saveFileToDownloadsPublic(
           dataBytes,
           filename,
         );
-
-        if (kDebugMode) {
+        if (kDebugMode)
           print('[_handleJsonDataDownload] JSON guardado en: $savePath');
-        }
         try {
           const platform = MethodChannel(
             'com.facturacion.sv.app_factura/files',
           );
           await platform.invokeMethod('scanFile', {'path': savePath});
         } catch (e) {
-          if (kDebugMode) {
-            print('Error solicitando scanFile: $e');
-          }
+          if (kDebugMode) print('Error solicitando scanFile: $e');
         }
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -880,9 +864,8 @@ class _HomeScreenState extends State<HomeScreen> {
         final String savePath = '${directory.path}/$filename';
         final File file = File(savePath);
         await file.writeAsString(jsonContent, flush: true);
-        if (kDebugMode) {
+        if (kDebugMode)
           print('[_handleJsonDataDownload] JSON guardado en: $savePath');
-        }
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -893,9 +876,8 @@ class _HomeScreenState extends State<HomeScreen> {
         }
       }
     } catch (e) {
-      if (kDebugMode) {
+      if (kDebugMode)
         print("[_handleJsonDataDownload] *** ERROR AL GUARDAR JSON: $e");
-      }
       _showErrorSnackBar('Error al guardar archivo JSON: ${e.toString()}');
     }
   }
@@ -907,16 +889,12 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
     _lastPdfDownloadTime = now;
-
     String cleanUrl = pdfUrl.trim();
-    if (!cleanUrl.startsWith('http')) {
-      cleanUrl = 'https://$cleanUrl';
-    }
+    if (!cleanUrl.startsWith('http')) cleanUrl = 'https://$cleanUrl';
     final uri = Uri.parse(cleanUrl);
 
     try {
       await _requestStoragePermissions();
-
       final String originalFileName = uri.pathSegments.isNotEmpty
           ? uri.pathSegments.last
                 .split('?')
@@ -925,7 +903,6 @@ class _HomeScreenState extends State<HomeScreen> {
           : 'documento.pdf';
       final String timestamp = DateTime.now().millisecondsSinceEpoch.toString();
       final String fileName = '${timestamp}_$originalFileName';
-
       final Directory tempDir = await getTemporaryDirectory();
       final String tempPath = '${tempDir.path}/$fileName';
 
@@ -942,41 +919,31 @@ class _HomeScreenState extends State<HomeScreen> {
           }
         },
       );
-
       final File tempFile = File(tempPath);
       final Uint8List fileBytes = await tempFile.readAsBytes();
-
       final String savePath = await _saveFileToDownloadsPublic(
         fileBytes,
         fileName,
       );
-
       await tempFile.delete();
 
       try {
         const platform = MethodChannel('com.facturacion.sv.app_factura/files');
         await platform.invokeMethod('scanFile', {'path': savePath});
       } catch (e) {
-        if (kDebugMode) {
-          print('Error solicitando scanFile: $e');
-        }
+        if (kDebugMode) print('Error solicitando scanFile: $e');
       }
-
       _showMessage('Archivo PDF guardado en Descargas: $fileName');
-
       final result = await OpenFilex.open(savePath);
-      if (kDebugMode) {
-        print('OpenFilex result: $result');
-      }
+      if (kDebugMode) print('OpenFilex result: $result');
       if (result.type != ResultType.done) {
         throw Exception(
           'OpenFilex no pudo abrir el archivo: ${result.message}',
         );
       }
     } catch (e) {
-      if (kDebugMode) {
+      if (kDebugMode)
         print('No fue posible descargar/abrir localmente el PDF: $e');
-      }
       _showErrorSnackBar('No se pudo abrir el PDF localmente: ${e.toString()}');
       try {
         if (await canLaunchUrl(uri)) {
@@ -985,9 +952,7 @@ class _HomeScreenState extends State<HomeScreen> {
           await launchUrl(uri, mode: LaunchMode.inAppWebView);
         }
       } catch (e2) {
-        if (kDebugMode) {
-          print('Error en fallback al abrir PDF: $e2');
-        }
+        if (kDebugMode) print('Error en fallback al abrir PDF: $e2');
         _showErrorSnackBar('No se pudo abrir el PDF de ninguna forma');
       }
     } finally {
@@ -1009,7 +974,6 @@ class _HomeScreenState extends State<HomeScreen> {
       }
       _lastPdfDownloadTime = now;
     }
-
     if (_isDownloading) {
       _showErrorSnackBar("Ya hay una descarga en curso.");
       return;
@@ -1028,7 +992,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
     final String timestamp = DateTime.now().millisecondsSinceEpoch.toString();
     String fileName = '${timestamp}_$originalFileName';
-
     setState(() {
       _isDownloading = true;
       _downloadProgress = 0.0;
@@ -1036,42 +999,31 @@ class _HomeScreenState extends State<HomeScreen> {
 
     try {
       await _requestStoragePermissions();
-
       final Directory tempDir = await getTemporaryDirectory();
       final String tempPath = '${tempDir.path}/$fileName';
-
       Dio dio = Dio();
       await dio.download(
         url,
         tempPath,
         onReceiveProgress: (received, total) {
           if (total != -1 && mounted) {
-            setState(() {
-              _downloadProgress = received / total;
-            });
+            setState(() => _downloadProgress = received / total);
           }
         },
       );
-
       final File tempFile = File(tempPath);
       final Uint8List fileBytes = await tempFile.readAsBytes();
-
       final String savePath = await _saveFileToDownloadsPublic(
         fileBytes,
         fileName,
       );
-
       await tempFile.delete();
-
       try {
         const platform = MethodChannel('com.facturacion.sv.app_factura/files');
         await platform.invokeMethod('scanFile', {'path': savePath});
       } catch (e) {
-        if (kDebugMode) {
-          print('Error solicitando scanFile: $e');
-        }
+        if (kDebugMode) print('Error solicitando scanFile: $e');
       }
-
       if (mounted) {
         if (url.endsWith('.pdf')) {
           _showMessage('Archivo PDF guardado en Descargas: $fileName');
@@ -1080,9 +1032,7 @@ class _HomeScreenState extends State<HomeScreen> {
         }
       }
     } catch (e) {
-      if (kDebugMode) {
-        print('Error en la descarga: $e');
-      }
+      if (kDebugMode) print('Error en la descarga: $e');
       _showErrorSnackBar('Error al descargar el archivo: ${e.toString()}');
     } finally {
       if (mounted) {
@@ -1124,9 +1074,7 @@ class _HomeScreenState extends State<HomeScreen> {
       final newStatus = await _storage.activateLicense(key);
       _activationKeyController.clear();
       widget.onStatusChangeNeeded();
-      if (mounted) {
-        setState(() => _activationStatus = newStatus);
-      }
+      if (mounted) setState(() => _activationStatus = newStatus);
       if (newStatus == ActivationStatus.pro) {
         _showMessage('¡Aplicación activada a PRO!');
       } else if (newStatus == ActivationStatus.demo) {
@@ -1135,16 +1083,12 @@ class _HomeScreenState extends State<HomeScreen> {
     } catch (e) {
       _showError(e.toString());
     } finally {
-      if (mounted) {
-        setState(() => _isActivating = false);
-      }
+      if (mounted) setState(() => _isActivating = false);
     }
   }
 
   Future<bool> handlePop() async {
-    if (!_showWebView) {
-      return false;
-    }
+    if (!_showWebView) return false;
     final canGoBack = await _controller?.canGoBack() ?? false;
     if (canGoBack) {
       _controller!.goBack();
@@ -1212,10 +1156,19 @@ class _HomeScreenState extends State<HomeScreen> {
                       _activationStatus.chipLabel,
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
-                        color: _getStatusChipTextColor(_activationStatus),
+                        // --- INICIO: CAMBIO ---
+                        // Ahora pasa el estado de brillo (oscuro/claro) a la función
+                        color: _getStatusChipTextColor(
+                          _activationStatus,
+                          theme.brightness == Brightness.dark,
+                        ),
+                        // --- FIN: CAMBIO ---
                       ),
                     ),
-                    backgroundColor: _getStatusChipColor(_activationStatus),
+                    backgroundColor: _getStatusChipColor(
+                      _activationStatus,
+                      theme.brightness == Brightness.dark,
+                    ),
                     side: BorderSide.none,
                     padding: const EdgeInsets.symmetric(
                       horizontal: 10,
@@ -1267,13 +1220,13 @@ class _HomeScreenState extends State<HomeScreen> {
         _buildGreeting(),
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 24.0),
-          child: Divider(color: Colors.grey[300], height: 1),
+          child: Divider(color: theme.dividerColor, height: 1),
         ),
         if (_activationStatus != ActivationStatus.pro) ...[
           _buildActivationSection(),
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 24.0),
-            child: Divider(color: Colors.grey[300], height: 1),
+            child: Divider(color: theme.dividerColor, height: 1),
           ),
         ],
         _buildOverlaySection(context, overlayEnabled ? _toggleWebView : null),
@@ -1309,39 +1262,52 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _toggleWebView() {
     if (_controller == null) {
-      setState(() {
-        _estaCargando = true;
-      });
+      setState(() => _estaCargando = true);
       _setupWebView();
     }
-    setState(() {
-      _showWebView = true;
-    });
+    setState(() => _showWebView = true);
   }
 
-  Color _getStatusChipColor(ActivationStatus status) {
+  Color _getStatusChipColor(ActivationStatus status, bool isDark) {
     switch (status) {
       case ActivationStatus.pro:
-        return Colors.green.shade50;
+        return isDark ? Colors.green.shade900 : Colors.green.shade50;
       case ActivationStatus.demo:
-        return Colors.orange.shade50;
+        return isDark ? Colors.orange.shade900 : Colors.orange.shade50;
       case ActivationStatus.none:
       default:
-        return Colors.grey.shade200;
+        return isDark ? Colors.grey.shade800 : Colors.grey.shade200;
     }
   }
 
-  Color _getStatusChipTextColor(ActivationStatus status) {
-    switch (status) {
-      case ActivationStatus.pro:
-        return Colors.green.shade800;
-      case ActivationStatus.demo:
-        return Colors.orange.shade800;
-      case ActivationStatus.none:
-      default:
-        return Colors.grey.shade700;
+  // --- INICIO: FUNCIÓN CORREGIDA ---
+  Color _getStatusChipTextColor(ActivationStatus status, bool isDark) {
+    // Si está en modo oscuro, el texto debe ser claro
+    if (isDark) {
+      switch (status) {
+        case ActivationStatus.pro:
+          return Colors.green.shade100; // Claro
+        case ActivationStatus.demo:
+          return Colors.orange.shade100; // Claro
+        case ActivationStatus.none:
+        default:
+          return Colors.grey.shade300; // Claro
+      }
+    }
+    // Si está en modo claro, el texto debe ser oscuro
+    else {
+      switch (status) {
+        case ActivationStatus.pro:
+          return Colors.green.shade800; // Oscuro
+        case ActivationStatus.demo:
+          return Colors.orange.shade800; // Oscuro
+        case ActivationStatus.none:
+        default:
+          return Colors.grey.shade700; // Oscuro
+      }
     }
   }
+  // --- FIN: FUNCIÓN CORREGIDA ---
 
   Widget _buildGreeting() {
     return const Text(
@@ -1444,22 +1410,20 @@ class _HomeScreenState extends State<HomeScreen> {
                     'assets/images/cardPrincipal.png',
                     fit: BoxFit.cover,
                     errorBuilder: (context, error, stackTrace) {
-                      if (kDebugMode) {
-                        print("Error cargando imagen: $error");
-                      }
+                      if (kDebugMode) print("Error cargando imagen: $error");
                       return Container(
                         height: 150,
-                        color: Colors.grey[200],
+                        color: theme.cardColor,
                         alignment: Alignment.center,
-                        child: const Icon(
+                        child: Icon(
                           Icons.broken_image,
-                          color: Colors.grey,
+                          color: theme.colorScheme.onSurfaceVariant,
                           size: 40,
                         ),
                       );
                     },
                   ),
-                  Divider(height: 1, color: Colors.grey[300]),
+                  Divider(height: 1, color: theme.dividerColor),
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 14.0),
                     child: Text(
@@ -1467,7 +1431,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       style: TextStyle(
                         color: isEnabled
                             ? theme.colorScheme.secondary
-                            : Colors.grey,
+                            : theme.disabledColor,
                         fontWeight: FontWeight.w500,
                         fontSize: 15,
                       ),
