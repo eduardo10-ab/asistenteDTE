@@ -152,7 +152,40 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
                         ),
                       ),
 
-                      // <<<--- BOTÓN TEMPORAL DE SIEMBRA (ELIMINADO) --- >>>
+                      // --- INICIO: NUEVA SECCIÓN DE POLÍTICAS ---
+                      const SizedBox(height: 16),
+                      Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(20),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Políticas de Privacidad',
+                                style: theme.textTheme.titleMedium,
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                'Revisa nuestros términos de servicio y políticas de privacidad.',
+                                style: theme.textTheme.bodyMedium,
+                              ),
+                              const SizedBox(height: 16),
+                              OutlinedButton.icon(
+                                onPressed: () {
+                                  // TODO: Añadir aquí la lógica para abrir el hipervínculo
+                                  // Ejemplo: _launchURL('https://tu-pagina-web.com/privacidad');
+                                },
+                                icon: const Icon(Icons.privacy_tip_outlined),
+                                label: const Text('Ver Política de Privacidad'),
+                                style: OutlinedButton.styleFrom(
+                                  minimumSize: const Size(double.infinity, 45),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      // --- FIN: NUEVA SECCIÓN DE POLÍTICAS ---
                     ],
                   ),
                 ),
@@ -170,4 +203,17 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
             ),
     );
   }
+
+  // (Si decides añadir el enlace ahora, necesitarías una función como esta)
+  // Future<void> _launchURL(String url) async {
+  //   final Uri uri = Uri.parse(url);
+  //   if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+  //     // Manejar el error si no se puede abrir
+  //     if (mounted) {
+  //       ScaffoldMessenger.of(context).showSnackBar(
+  //         const SnackBar(content: Text('No se pudo abrir el enlace.')),
+  //       );
+  //     }
+  //   }
+  // }
 }
