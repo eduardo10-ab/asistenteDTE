@@ -266,13 +266,29 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
       if (!mounted) return;
       Navigator.pop(context);
 
+      // --- INICIO: CAMBIO ---
+      // Se combinan 'direccion' (Lugar de Nacimiento) y 'pais'
+      final String pais = datosExtraidos['pais'] ?? '';
+      final String lugarNacimiento = datosExtraidos['direccion'] ?? '';
+
+      final String direccionComplemento;
+      if (lugarNacimiento.isNotEmpty && pais.isNotEmpty) {
+        direccionComplemento = '$lugarNacimiento, $pais';
+      } else {
+        direccionComplemento = lugarNacimiento;
+      }
+
       final clientePrellenado = Cliente(
         id: '',
         nombreCliente: datosExtraidos['nombre'] ?? '',
         pasaporte: datosExtraidos['pasaporte'] ?? '',
-        pais: datosExtraidos['pais'] ?? '',
+        pais: pais,
+        direccion: direccionComplemento, // <-- 'SANTA ANA, EL SALVADOR'
+        departamento: '00 - Otro (Para extranjero)', // <-- CORREGIDO
+        municipio: '00 - Otro (Para extranjero)', // <-- CORREGIDO
         tipoPersona: 'NATURAL',
       );
+      // --- FIN: CAMBIO ---
 
       _showFormWithData(clientePrellenado);
     } catch (e) {
@@ -824,7 +840,7 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
         OutlinedButton.icon(
           onPressed: allowWriteActions ? _onScanDUI : null,
           icon: const Icon(Icons.camera_alt_outlined),
-          label: const Text('Escanear DUI para autocompletar'),
+          label: const Text('Escanear DUI con IA'),
           style: OutlinedButton.styleFrom(
             minimumSize: const Size(double.infinity, 45),
             foregroundColor: colorAzulActivo,
@@ -871,14 +887,14 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
         OutlinedButton.icon(
           onPressed: allowWriteActions ? _onScanPasaporte : null,
           icon: const Icon(Icons.contact_mail_outlined),
-          label: const Text('Escanear Pasaporte'),
+          label: const Text('Escanear Pasaporte con IA'),
           style: buttonStyle,
         ),
         const SizedBox(height: 12),
         OutlinedButton.icon(
           onPressed: allowWriteActions ? _onScanCarnetResidencial : null,
           icon: const Icon(Icons.badge_outlined),
-          label: const Text('Escanear Carnet Residencial'),
+          label: const Text('Escanear Carnet Residencial con IA'),
           style: buttonStyle,
         ),
         const SizedBox(height: 12),
