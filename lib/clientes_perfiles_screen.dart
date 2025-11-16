@@ -266,8 +266,6 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
       if (!mounted) return;
       Navigator.pop(context);
 
-      // --- INICIO: CAMBIO ---
-      // Se combinan 'direccion' (Lugar de Nacimiento) y 'pais'
       final String pais = datosExtraidos['pais'] ?? '';
       final String lugarNacimiento = datosExtraidos['direccion'] ?? '';
 
@@ -283,12 +281,11 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
         nombreCliente: datosExtraidos['nombre'] ?? '',
         pasaporte: datosExtraidos['pasaporte'] ?? '',
         pais: pais,
-        direccion: direccionComplemento, // <-- 'SANTA ANA, EL SALVADOR'
-        departamento: '00 - Otro (Para extranjero)', // <-- CORREGIDO
-        municipio: '00 - Otro (Para extranjero)', // <-- CORREGIDO
+        direccion: direccionComplemento,
+        departamento: '00 - Otro (Para extranjero)',
+        municipio: '00 - Otro (Para extranjero)',
         tipoPersona: 'NATURAL',
       );
-      // --- FIN: CAMBIO ---
 
       _showFormWithData(clientePrellenado);
     } catch (e) {
@@ -298,6 +295,7 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
     }
   }
 
+  // --- ESTAS FUNCIONES AHORA SOLO MUESTRAN ERROR ---
   void _onScanCarnetResidencial() {
     _showError('Función para escanear Carnet Residencial no implementada.');
   }
@@ -305,6 +303,7 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
   void _onScanOtroDocumento() {
     _showError('Función para escanear Otro Documento no implementada.');
   }
+  // ---
 
   void _showLoadingDialog() {
     showDialog(
@@ -874,6 +873,7 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
     );
   }
 
+  // --- INICIO: WIDGET DE BOTONES MODIFICADO ---
   Widget _buildForeignerButtons(bool allowWriteActions) {
     final buttonStyle = OutlinedButton.styleFrom(
       minimumSize: const Size(double.infinity, 45),
@@ -890,20 +890,21 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
           label: const Text('Escanear Pasaporte con IA'),
           style: buttonStyle,
         ),
-        const SizedBox(height: 12),
-        OutlinedButton.icon(
-          onPressed: allowWriteActions ? _onScanCarnetResidencial : null,
-          icon: const Icon(Icons.badge_outlined),
-          label: const Text('Escanear Carnet Residencial con IA'),
-          style: buttonStyle,
-        ),
-        const SizedBox(height: 12),
-        OutlinedButton.icon(
-          onPressed: allowWriteActions ? _onScanOtroDocumento : null,
-          icon: const Icon(Icons.description_outlined),
-          label: const Text('Escanear Otro Documento'),
-          style: buttonStyle,
-        ),
+        // --- BOTONES ELIMINADOS ---
+        // const SizedBox(height: 12),
+        // OutlinedButton.icon(
+        //   onPressed: allowWriteActions ? _onScanCarnetResidencial : null,
+        //   icon: const Icon(Icons.badge_outlined),
+        //   label: const Text('Escanear Carnet Residencial con IA'),
+        //   style: buttonStyle,
+        // ),
+        // const SizedBox(height: 12),
+        // OutlinedButton.icon(
+        //   onPressed: allowWriteActions ? _onScanOtroDocumento : null,
+        //   icon: const Icon(Icons.description_outlined),
+        //   label: const Text('Escanear Otro Documento'),
+        //   style: buttonStyle,
+        // ),
         const SizedBox(height: 16),
         SizedBox(
           width: double.infinity,
@@ -926,6 +927,7 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
       ],
     );
   }
+  // --- FIN: WIDGET DE BOTONES MODIFICADO ---
 
   Widget _buildSectionCard({required String title, required Widget child}) {
     final theme = Theme.of(context);

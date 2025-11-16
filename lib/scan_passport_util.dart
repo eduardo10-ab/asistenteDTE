@@ -129,6 +129,18 @@ class PassportParser {
       'MEX': 'MÉXICO',
       'CAN': 'CANADÁ',
       'ESP': 'ESPAÑA',
+      'DEU': 'ALEMANIA',
+      'FRA': 'FRANCIA',
+      'ITA': 'ITALIA',
+      'GBR': 'REINO UNIDO',
+      'COL': 'COLOMBIA',
+      'ARG': 'ARGENTINA',
+      'BRA': 'BRASIL',
+      'CHL': 'CHILE',
+      'PER': 'PERÚ',
+      'CHN': 'CHINA',
+      'JPN': 'JAPÓN',
+      'KOR': 'REPÚBLICA DE COREA',
     };
 
     String mappedName = codeMap[code] ?? code;

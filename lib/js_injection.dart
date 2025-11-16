@@ -727,18 +727,24 @@ async function fillClientData(client) {
             tipoDocValue = "DUI"; 
             documentoARellenar = client.dui; 
             campoDocumentoSelector = "input[formcontrolname='dui']";
+        
+        // --- INICIO: CAMBIO ---
         } else if (client.pasaporte && client.pasaporte.length > 0) { 
             tipoDocValue = "PASAPORTE"; 
             documentoARellenar = client.pasaporte; 
-            campoDocumentoSelector = "input[formcontrolname='pasaporte']";
+            campoDocumentoSelector = "input[formcontrolname='otro']"; // <-- CAMPO CORREGIDO
+        
         } else if (client.carnetResidente && client.carnetResidente.length > 0) { 
             tipoDocValue = "RESIDENTE"; 
             documentoARellenar = client.carnetResidente; 
             campoDocumentoSelector = "input[formcontrolname='carnetResidente']";
+        
         } else if (client.otroDocumento && client.otroDocumento.length > 0) { 
             tipoDocValue = "OTRO"; 
             documentoARellenar = client.otroDocumento; 
-            campoDocumentoSelector = "input[formcontrolname='otroDocumento']";
+            campoDocumentoSelector = "input[formcontrolname='otro']"; // <-- CAMPO CORREGIDO
+        // --- FIN: CAMBIO ---
+            
         } else if (client.nit && client.nit.length > 0) {
             tipoDocValue = "NIT";
             documentoARellenar = client.nit;
