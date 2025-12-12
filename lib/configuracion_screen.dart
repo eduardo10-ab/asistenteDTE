@@ -1,10 +1,9 @@
 // lib/configuracion_screen.dart
 import 'package:flutter/material.dart';
-// import 'package:cloud_firestore/cloud_firestore.dart'; // <--- ELIMINADO
+import 'package:url_launcher/url_launcher.dart'; // Importante: Librería para abrir el enlace
 import 'models.dart';
 import 'storage_service.dart';
 import 'main.dart'; // Para colores del tema
-// import 'package:firebase_core/firebase_core.dart'; // <--- ELIMINADO
 
 class ConfiguracionScreen extends StatefulWidget {
   const ConfiguracionScreen({super.key});
@@ -35,8 +34,23 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
     });
   }
 
-  // <<<--- FUNCIÓN TEMPORAL DE SIEMBRA (ELIMINADA) --- >>>
-  // ... La función _sembrarDatosTemporal() se ha borrado ...
+  // Función para abrir el enlace de políticas
+  Future<void> _abrirPoliticas() async {
+    final Uri url = Uri.parse(
+      'https://drive.google.com/file/d/1cf2wmjUVlTGlXAo1dQDbEc020FkU04gQ/view?usp=sharing',
+    );
+
+    // Intentamos abrir el enlace en una aplicación externa (navegador o Drive)
+    if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No se pudo abrir el enlace de políticas'),
+          ),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -92,7 +106,7 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Activacion',
+                                'Activación',
                                 style: theme.textTheme.titleMedium,
                               ),
                               const SizedBox(height: 16),
@@ -123,12 +137,12 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Soporte tecnico',
+                                'Soporte técnico',
                                 style: theme.textTheme.titleMedium,
                               ),
                               const SizedBox(height: 16),
                               Text(
-                                'Reporte de errores de la aplicaion por favor contactarnos:',
+                                'Reporte de errores de la aplicación por favor contactarnos:',
                                 style: theme.textTheme.bodyLarge?.copyWith(
                                   color: theme.disabledColor,
                                 ),
@@ -152,7 +166,50 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
                         ),
                       ),
 
-                      // <<<--- BOTÓN TEMPORAL DE SIEMBRA (ELIMINADO) --- >>>
+                      // --- Card 4: Políticas de Privacidad (BOTÓN ACTUALIZADO) ---
+                      const SizedBox(height: 16),
+                      Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(20),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Políticas de privacidad',
+                                style: theme.textTheme.titleMedium,
+                              ),
+                              const SizedBox(height: 16),
+                              SizedBox(
+                                width: double.infinity,
+                                // CAMBIO AQUÍ: Usamos FilledButton con estilo específico
+                                child: FilledButton(
+                                  onPressed: _abrirPoliticas,
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: Colors
+                                        .cyan, // El color azul brillante de la imagen
+                                    foregroundColor:
+                                        Colors.white, // Texto blanco
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 12,
+                                    ), // Un poco más alto
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(
+                                        8.0,
+                                      ), // Bordes redondeados similares
+                                    ),
+                                  ),
+                                  child: const Text(
+                                    'Ver políticas de privacidad',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
