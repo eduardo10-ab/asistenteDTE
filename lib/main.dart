@@ -13,6 +13,7 @@ import 'dart:convert';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'package:flutter/foundation.dart'; // Para kDebugMode
+import 'package:provider/provider.dart'; // <--- IMPORTANTE: Provider
 
 // --- Imports ---
 import 'clientes_perfiles_screen.dart';
@@ -23,8 +24,9 @@ import 'models.dart';
 import 'storage_service.dart';
 import 'js_injection.dart';
 import 'correo_screen.dart';
+import 'theme_provider.dart'; // <--- IMPORTANTE: Tu archivo de tema
 
-// --- Colores ---
+// --- Colores Constantes (Modo Claro) ---
 const Color colorBlanco = Colors.white;
 const Color colorCelestePastel = Color(0xFF80D8FF);
 const Color colorAzulActivo = Color(0xFF40C4FF);
@@ -32,11 +34,22 @@ const Color colorGrisClaro = Color(0xFFF5F5F5);
 const Color colorTextoPrincipal = Color(0xFF424242);
 const Color colorTextoSecundario = Color(0xFF9E9E9E);
 
+// --- Colores Constantes (Modo Oscuro) ---
+const Color colorFondoOscuro = Color(0xFF121212);
+const Color colorCardOscuro = Color(0xFF1E1E1E);
+const Color colorTextoOscuro = Color(0xFFE0E0E0);
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
-  runApp(const MyApp());
+  // Envolvemos la app en el ChangeNotifierProvider para manejar el estado del tema
+  runApp(
+    ChangeNotifierProvider(
+      create: (_) => ThemeProvider(),
+      child: const MyApp(),
+    ),
+  );
 }
 
 // --- MyApp ---
@@ -44,10 +57,19 @@ class MyApp extends StatelessWidget {
   const MyApp({super.key});
   @override
   Widget build(BuildContext context) {
+    // Escuchamos los cambios del tema
+    final themeProvider = Provider.of<ThemeProvider>(context);
+
     return MaterialApp(
       title: 'Facturación App',
       debugShowCheckedModeBanner: false,
+
+      // Le decimos a la app qué modo usar (Claro, Oscuro o Sistema)
+      themeMode: themeProvider.themeMode,
+
+      // --- TEMA CLARO (Tu diseño original) ---
       theme: ThemeData(
+        brightness: Brightness.light,
         colorScheme: ColorScheme.fromSeed(
           seedColor: colorCelestePastel,
           primary: colorCelestePastel,
@@ -189,6 +211,139 @@ class MyApp extends StatelessWidget {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
       ),
+
+      // --- TEMA OSCURO (Nueva Configuración) ---
+      darkTheme: ThemeData(
+        brightness: Brightness.dark,
+        colorScheme: ColorScheme.fromSeed(
+          brightness: Brightness.dark,
+          seedColor: colorCelestePastel,
+          primary: colorAzulActivo,
+          secondary: colorCelestePastel,
+          surface: colorFondoOscuro,
+          onSurface: colorTextoOscuro,
+          surfaceContainerHighest: colorCardOscuro,
+          error: Colors.red[300] ?? Colors.red,
+        ),
+        scaffoldBackgroundColor: colorFondoOscuro,
+        appBarTheme: const AppBarTheme(
+          backgroundColor: colorFondoOscuro,
+          foregroundColor: colorTextoOscuro,
+          elevation: 0,
+          iconTheme: IconThemeData(color: colorTextoOscuro),
+          titleTextStyle: TextStyle(
+            color: colorTextoOscuro,
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+          backgroundColor: colorCardOscuro,
+          elevation: 2,
+          selectedItemColor: colorAzulActivo,
+          unselectedItemColor: Colors.grey,
+          type: BottomNavigationBarType.fixed,
+          showUnselectedLabels: true,
+        ),
+        floatingActionButtonTheme: const FloatingActionButtonThemeData(
+          backgroundColor: colorAzulActivo,
+          foregroundColor: colorBlanco,
+        ),
+        cardTheme: CardThemeData(
+          color: colorCardOscuro,
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          margin: const EdgeInsets.only(bottom: 16),
+        ),
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: colorAzulActivo,
+            foregroundColor: colorBlanco,
+            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+        ),
+        outlinedButtonTheme: OutlinedButtonThemeData(
+          style: OutlinedButton.styleFrom(
+            foregroundColor: colorAzulActivo,
+            side: const BorderSide(color: colorAzulActivo),
+            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+        ),
+        // Ajustamos los inputs para que se vean bien en oscuro
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: colorCardOscuro,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 12,
+          ),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide(color: Colors.grey[700]!),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide(color: Colors.grey[700]!),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: const BorderSide(color: colorAzulActivo, width: 1.5),
+          ),
+          hintStyle: const TextStyle(color: Colors.grey),
+          labelStyle: const TextStyle(color: Colors.grey),
+        ),
+        dropdownMenuTheme: DropdownMenuThemeData(
+          inputDecorationTheme: InputDecorationTheme(
+            filled: true,
+            fillColor: colorCardOscuro,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 12,
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: Colors.grey[700]!),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: Colors.grey[700]!),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: colorAzulActivo, width: 1.5),
+            ),
+          ),
+        ),
+        textTheme: const TextTheme(
+          bodyLarge: TextStyle(color: colorTextoOscuro, fontSize: 16),
+          bodyMedium: TextStyle(color: Colors.grey, fontSize: 14),
+          titleLarge: TextStyle(
+            color: colorTextoOscuro,
+            fontWeight: FontWeight.bold,
+            fontSize: 24,
+          ),
+          titleMedium: TextStyle(
+            color: colorTextoOscuro,
+            fontWeight: FontWeight.w600,
+            fontSize: 18,
+          ),
+        ),
+        chipTheme: ChipThemeData(
+          backgroundColor: colorCardOscuro,
+          labelStyle: const TextStyle(color: colorTextoOscuro),
+          side: BorderSide.none,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+      ),
+
       home: const MainScreen(),
     );
   }
@@ -203,7 +358,7 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
-  // NUEVO: Variable para controlar si el menú está abierto
+  // Variable para controlar si el menú está abierto
   bool _isMenuOpen = false;
 
   WebViewController? _webViewController;
@@ -313,7 +468,7 @@ class _MainScreenState extends State<MainScreen> {
     return true;
   }
 
-  // NUEVO: Moví la función aquí adentro para controlar _isMenuOpen
+  // Función para controlar el menú flotante y ocultar la pluma
   Future<void> _mostrarMenuFlotanteInterno() async {
     setState(() {
       _isMenuOpen = true; // 1. Ocultar el botón
@@ -353,7 +508,7 @@ class _MainScreenState extends State<MainScreen> {
       },
       child: Scaffold(
         body: IndexedStack(index: _selectedIndex, children: _widgetOptions),
-        // CAMBIO: Ahora verificamos también que el menú NO esté abierto (!__isMenuOpen)
+        // Verificamos también que el menú NO esté abierto (!__isMenuOpen)
         floatingActionButton: (_selectedIndex == 0 && !_isMenuOpen)
             ? FloatingActionButton(
                 onPressed: () {
@@ -1200,6 +1355,8 @@ class _HomeScreenState extends State<HomeScreen> {
     final bool overlayEnabled =
         _activationStatus == ActivationStatus.demo ||
         _activationStatus == ActivationStatus.pro;
+
+    // Obtenemos el tema actual (Claro u Oscuro)
     final theme = Theme.of(context);
 
     return Scaffold(

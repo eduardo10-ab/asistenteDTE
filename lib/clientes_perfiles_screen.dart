@@ -54,7 +54,6 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
       final profile = await _storage.getCurrentProfileName();
       final names = await _storage.getProfileNames();
       final clientes = await _storage.getClientes();
-      // <<< FIX: `use_build_context_synchronously` --- >>>
       if (!mounted) return;
       setState(() {
         _perfilActivo = profile;
@@ -65,7 +64,6 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
         _clienteParaEditar = null;
       });
     } catch (e) {
-      // <<< FIX: `use_build_context_synchronously` --- >>>
       if (!mounted) return;
       _showError(e.toString());
       setState(() {
@@ -90,7 +88,6 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
 
   // --- Lógica de Perfiles ---
   void _onAddProfile() async {
-    // <<< FIX: `use_build_context_synchronously` --- >>>
     if (!mounted) return;
     final name = await _showInputDialog(
       'Crear Nuevo Perfil',
@@ -107,7 +104,6 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
   }
 
   void _onRenameProfile() async {
-    // <<< FIX: `use_build_context_synchronously` --- >>>
     if (!mounted) return;
     final name = await _showInputDialog(
       'Renombrar Perfil',
@@ -125,14 +121,12 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
   }
 
   void _onDeleteProfile() async {
-    // <<< FIX: `use_build_context_synchronously` --- >>>
     if (!mounted) return;
     final bool? confirmed = await showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Eliminar Perfil'),
         content: Text(
-          // <<< FIX: `unnecessary_brace_in_string_interps` --- >>>
           '¿Seguro que quieres eliminar el perfil "$_perfilActivo"? Esta acción no se puede deshacer.',
         ),
         actions: [
@@ -164,7 +158,6 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
         await _storage.switchProfile(newProfile);
         _loadAllData(widget.currentStatus);
       } catch (e) {
-        // <<< FIX: `use_build_context_synchronously` --- >>>
         if (!mounted) return;
         _showError(e.toString());
       }
@@ -190,7 +183,6 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
   }
 
   void _onDeleteCliente(String id) async {
-    // <<< FIX: `use_build_context_synchronously` --- >>>
     if (!mounted) return;
     final bool? confirmed = await showDialog(
       context: context,
@@ -232,7 +224,6 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
   }
 
   void _onImport() async {
-    // <<< FIX: `use_build_context_synchronously` --- >>>
     if (!mounted) return;
     final jsonToImport = await _showInputDialog(
       'Importar Copia',
@@ -256,13 +247,11 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
     int maxLines = 1,
   }) {
     final controller = TextEditingController(text: initialValue);
-    // <<< FIX: `use_build_context_synchronously` --- >>>
-    // (Asegurarse de que el context de build esté disponible antes de llamar a showDialog)
-    // En este caso, 'context' se pasa desde el 'build' que llama a esta función.
     return showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: Theme.of(context).cardColor,
+        // Aseguramos que el diálogo use el color de tarjeta del tema
+        backgroundColor: Theme.of(context).cardTheme.color,
         title: Text(title),
         content: TextField(
           controller: controller,
@@ -287,20 +276,23 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    // <<< FIX: `MaterialStateProperty` y `withOpacity` obsoletos reemplazados >>>
+
+    // Estilo dinámico para los botones Outlined
     final secondaryButtonStyle = OutlinedButton.styleFrom(
-      foregroundColor: colorTextoPrincipal.withAlpha(204), // 80% opacity
-      side: BorderSide(color: Colors.grey[300]!),
+      // Usamos onSurface para que el texto sea blanco en modo oscuro y negro en claro
+      foregroundColor: theme.colorScheme.onSurface.withAlpha(204),
+      side: BorderSide(color: theme.dividerColor),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       textStyle: const TextStyle(fontWeight: FontWeight.w500),
     );
+
     final bool allowWriteActions =
         widget.currentStatus != ActivationStatus.none;
     final bool isPro = widget.currentStatus == ActivationStatus.pro;
 
     return Scaffold(
-      backgroundColor: colorBlanco,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(title: const Text('Clientes y Perfiles')),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -348,8 +340,8 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
                         style: theme.textTheme.bodyLarge?.copyWith(
                           overflow: TextOverflow.ellipsis,
                         ),
-                        // <<< FIX: `value` obsoleto, reemplazado por `initialValue` o
-                        // `decoration` (aquí 'decoration' es lo correcto) >>>
+                        // El theme de main.dart ya maneja el decoration, pero podemos forzar:
+                        dropdownColor: theme.cardTheme.color,
                         decoration: const InputDecoration(),
                         isExpanded: true,
                       ),
@@ -375,45 +367,20 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
                               icon: Icon(
                                 Icons.delete_outline,
                                 size: 18,
-                                // <<< FIX: `withOpacity` obsoleto >>>
                                 color: dangerColor.withAlpha(
-                                  allowWriteActions ? 204 : 102, // 80% o 40%
+                                  allowWriteActions ? 204 : 102,
                                 ),
                               ),
                               label: Text(
                                 'Eliminar',
                                 style: TextStyle(
-                                  // <<< FIX: `withOpacity` obsoleto >>>
                                   color: dangerColor.withAlpha(
-                                    allowWriteActions ? 230 : 102, // 90% o 40%
+                                    allowWriteActions ? 230 : 102,
                                   ),
                                 ),
                               ),
-                              // <<< FIX: `MaterialStateProperty` obsoleto >>>
                               style: ButtonStyle(
-                                foregroundColor:
-                                    WidgetStateProperty.resolveWith<Color?>((
-                                      Set<WidgetState> states,
-                                    ) {
-                                      if (states.contains(
-                                        WidgetState.disabled,
-                                      )) {
-                                        return Colors.grey.withAlpha(102);
-                                      }
-                                      return dangerColor.withAlpha(230);
-                                    }),
-                                side:
-                                    WidgetStateProperty.resolveWith<BorderSide>(
-                                      (Set<WidgetState> states) {
-                                        final color =
-                                            states.contains(
-                                              WidgetState.disabled,
-                                            )
-                                            ? Colors.grey.withAlpha(51)
-                                            : dangerColor.withAlpha(128);
-                                        return BorderSide(color: color);
-                                      },
-                                    ),
+                                // Overlaycolor y side ajustados manualmente si es necesario
                               ).merge(secondaryButtonStyle),
                             ),
                           ),
@@ -449,7 +416,6 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
                                 size: 18,
                               ),
                               label: const Text('Copia Seg.'),
-                              // <<< FIX: `MaterialStateProperty` obsoleto >>>
                               style: ButtonStyle(
                                 foregroundColor:
                                     WidgetStateProperty.resolveWith<Color?>((
@@ -461,20 +427,6 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
                                           ? Colors.grey
                                           : tealColor;
                                     }),
-                                side:
-                                    WidgetStateProperty.resolveWith<BorderSide>(
-                                      (Set<WidgetState> states) {
-                                        final color =
-                                            states.contains(
-                                              WidgetState.disabled,
-                                            )
-                                            ? Colors.grey
-                                            : tealColor;
-                                        return BorderSide(
-                                          color: color.withAlpha(128),
-                                        );
-                                      },
-                                    ),
                               ).merge(secondaryButtonStyle),
                             ),
                           ),
@@ -487,7 +439,6 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
                                 size: 18,
                               ),
                               label: const Text('Importar'),
-                              // <<< FIX: `MaterialStateProperty` obsoleto >>>
                               style: ButtonStyle(
                                 foregroundColor:
                                     WidgetStateProperty.resolveWith<Color?>((
@@ -499,20 +450,6 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
                                           ? Colors.grey
                                           : successColor;
                                     }),
-                                side:
-                                    WidgetStateProperty.resolveWith<BorderSide>(
-                                      (Set<WidgetState> states) {
-                                        final color =
-                                            states.contains(
-                                              WidgetState.disabled,
-                                            )
-                                            ? Colors.grey
-                                            : successColor;
-                                        return BorderSide(
-                                          color: color.withAlpha(128),
-                                        );
-                                      },
-                                    ),
                               ).merge(secondaryButtonStyle),
                             ),
                           ),
@@ -600,7 +537,8 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
                                 vertical: 12,
                               ),
                               decoration: BoxDecoration(
-                                color: colorGrisClaro,
+                                // Color de fondo del ítem según tema
+                                color: theme.cardTheme.color,
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Row(
@@ -634,10 +572,10 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
                                   IconButton(
                                     icon: Icon(
                                       Icons.delete_outline,
-                                      // <<< FIX: `withOpacity` obsoleto >>>
                                       color: allowWriteActions
-                                          ? colorTextoSecundario
-                                          : Colors.grey.withAlpha(128), // 50%
+                                          ? theme.colorScheme.onSurface
+                                                .withOpacity(0.6)
+                                          : Colors.grey.withAlpha(128),
                                       size: 20,
                                     ),
                                     onPressed: allowWriteActions
@@ -661,6 +599,7 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
   Widget _buildSectionCard({required String title, required Widget child}) {
     final theme = Theme.of(context);
     return Card(
+      // La tarjeta tomará el color del tema automáticamente
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(

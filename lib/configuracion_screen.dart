@@ -1,9 +1,11 @@
 // lib/configuracion_screen.dart
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart'; // Importante: Librería para abrir el enlace
+import 'package:url_launcher/url_launcher.dart';
+import 'package:provider/provider.dart'; // <--- IMPORTANTE
 import 'models.dart';
 import 'storage_service.dart';
-import 'main.dart'; // Para colores del tema
+import 'main.dart'; // Para colores del tema si se necesitan
+import 'theme_provider.dart'; // <--- IMPORTANTE
 
 class ConfiguracionScreen extends StatefulWidget {
   const ConfiguracionScreen({super.key});
@@ -34,13 +36,10 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
     });
   }
 
-  // Función para abrir el enlace de políticas
   Future<void> _abrirPoliticas() async {
     final Uri url = Uri.parse(
       'https://drive.google.com/file/d/1cf2wmjUVlTGlXAo1dQDbEc020FkU04gQ/view?usp=sharing',
     );
-
-    // Intentamos abrir el enlace en una aplicación externa (navegador o Drive)
     if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -57,6 +56,9 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
+    // Obtenemos el provider para saber qué tema está seleccionado
+    final themeProvider = Provider.of<ThemeProvider>(context);
+
     return Scaffold(
       backgroundColor: colorScheme.background,
       appBar: AppBar(title: const Text('Configuración')),
@@ -68,34 +70,59 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
                   child: ListView(
                     padding: const EdgeInsets.all(16.0),
                     children: [
-                      // --- Card 1: Estado ---
+                      // --- NUEVA SECCIÓN: VISUALIZACIÓN ---
                       Card(
                         child: Padding(
-                          padding: const EdgeInsets.all(20),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                'Estado de la Aplicación',
-                                style: theme.textTheme.titleMedium,
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                'Estado actual: ${_activationStatus.displayName}',
-                                style: theme.textTheme.bodyLarge?.copyWith(
-                                  color: _activationStatus.color,
-                                  fontWeight: FontWeight.bold,
+                              Padding(
+                                padding: const EdgeInsets.only(
+                                  left: 20,
+                                  top: 10,
+                                  bottom: 5,
+                                ),
+                                child: Text(
+                                  'Visualización',
+                                  style: theme.textTheme.titleMedium,
                                 ),
                               ),
-                              const SizedBox(height: 10),
-                              Text(
-                                _activationStatus.description,
-                                style: theme.textTheme.bodyMedium,
+                              // Opción: Usar tema del dispositivo
+                              RadioListTile<ThemeMode>(
+                                title: const Text('Usar tema del dispositivo'),
+                                value: ThemeMode.system,
+                                groupValue: themeProvider.themeMode,
+                                onChanged: (value) {
+                                  if (value != null)
+                                    themeProvider.setThemeMode(value);
+                                },
+                              ),
+                              // Opción: Modo claro
+                              RadioListTile<ThemeMode>(
+                                title: const Text('Modo claro'),
+                                value: ThemeMode.light,
+                                groupValue: themeProvider.themeMode,
+                                onChanged: (value) {
+                                  if (value != null)
+                                    themeProvider.setThemeMode(value);
+                                },
+                              ),
+                              // Opción: Modo oscuro
+                              RadioListTile<ThemeMode>(
+                                title: const Text('Modo oscuro'),
+                                value: ThemeMode.dark,
+                                groupValue: themeProvider.themeMode,
+                                onChanged: (value) {
+                                  if (value != null)
+                                    themeProvider.setThemeMode(value);
+                                },
                               ),
                             ],
                           ),
                         ),
                       ),
+                      const SizedBox(height: 16),
 
                       // --- Card 2: Activación ---
                       const SizedBox(height: 16),
@@ -121,6 +148,45 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
                                 style: theme.textTheme.bodyLarge?.copyWith(
                                   color: theme.disabledColor,
                                   fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 16),
+                      Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(20),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Políticas de privacidad',
+                                style: theme.textTheme.titleMedium,
+                              ),
+                              const SizedBox(height: 16),
+                              SizedBox(
+                                width: double.infinity,
+                                child: FilledButton(
+                                  onPressed: _abrirPoliticas,
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: Colors.cyan,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 12,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8.0),
+                                    ),
+                                  ),
+                                  child: const Text(
+                                    'Ver políticas de privacidad',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
                                 ),
                               ),
                             ],
@@ -166,55 +232,12 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
                         ),
                       ),
 
-                      // --- Card 4: Políticas de Privacidad (BOTÓN ACTUALIZADO) ---
-                      const SizedBox(height: 16),
-                      Card(
-                        child: Padding(
-                          padding: const EdgeInsets.all(20),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Políticas de privacidad',
-                                style: theme.textTheme.titleMedium,
-                              ),
-                              const SizedBox(height: 16),
-                              SizedBox(
-                                width: double.infinity,
-                                // CAMBIO AQUÍ: Usamos FilledButton con estilo específico
-                                child: FilledButton(
-                                  onPressed: _abrirPoliticas,
-                                  style: FilledButton.styleFrom(
-                                    backgroundColor: Colors
-                                        .cyan, // El color azul brillante de la imagen
-                                    foregroundColor:
-                                        Colors.white, // Texto blanco
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 12,
-                                    ), // Un poco más alto
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(
-                                        8.0,
-                                      ), // Bordes redondeados similares
-                                    ),
-                                  ),
-                                  child: const Text(
-                                    'Ver políticas de privacidad',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
+                      // --- Card 4: Políticas de Privacidad ---
                     ],
                   ),
                 ),
 
-                // --- Texto de Créditos (Footer) ---
+                // --- Footer ---
                 Padding(
                   padding: const EdgeInsets.all(20.0),
                   child: Text(

@@ -1,10 +1,10 @@
 // lib/correo_screen.dart
-import 'package:flutter/foundation.dart'; // <<< AÑADIDO PARA kDebugMode
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'models.dart';
 import 'storage_service.dart';
-import 'main.dart'; // Para los colores
+import 'main.dart'; // Para colores específicos como azul activo
 
 class CorreoScreen extends StatefulWidget {
   final ActivationStatus currentStatus;
@@ -18,8 +18,8 @@ class CorreoScreenState extends State<CorreoScreen> {
   final StorageService _storage = StorageService();
   bool _isLoading = true;
   Cliente? _recentClient;
-  List<Cliente> _allClients = []; // Lista completa de clientes del perfil
-  List<Cliente> _filteredClients = []; // Lista filtrada por la búsqueda
+  List<Cliente> _allClients = [];
+  List<Cliente> _filteredClients = [];
   String _currentProfileName = "";
   final TextEditingController _searchController = TextEditingController();
 
@@ -80,7 +80,7 @@ class CorreoScreenState extends State<CorreoScreen> {
       setState(() {
         _recentClient = foundRecent;
         _allClients = allClients;
-        _filteredClients = allClients; // Inicialmente muestra todos
+        _filteredClients = allClients;
         _currentProfileName = profileName;
         _isLoading = false;
       });
@@ -90,7 +90,6 @@ class CorreoScreenState extends State<CorreoScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _isLoading = false);
-      // <<< FIX: `print` reemplazado por `kDebugMode` >>>
       if (kDebugMode) {
         print("Error cargando datos en CorreoScreen: $e");
       }
@@ -139,10 +138,13 @@ Saludos.
 
   @override
   Widget build(BuildContext context) {
+    // Obtenemos el tema actual
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: colorBlanco,
+      // Usamos el color de fondo del tema en lugar de colorBlanco fijo
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(title: const Text('Correo')),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -180,7 +182,8 @@ Saludos.
                       hintText: 'Buscar cliente...',
                       prefixIcon: const Icon(Icons.search, color: Colors.grey),
                       filled: true,
-                      fillColor: colorGrisClaro,
+                      // Usamos el color de relleno del input definido en el tema main.dart
+                      fillColor: theme.inputDecorationTheme.fillColor,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide: BorderSide.none,
@@ -217,10 +220,8 @@ Saludos.
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        // <<< FIX: `withOpacity` reemplazado por `withAlpha` (10% = 26) >>>
         color: colorCelestePastel.withAlpha(26),
         borderRadius: BorderRadius.circular(12),
-        // <<< FIX: `withOpacity` reemplazado por `withAlpha` (30% = 77) >>>
         border: Border.all(color: colorCelestePastel.withAlpha(77)),
       ),
       child: Row(
@@ -260,8 +261,8 @@ Saludos.
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        // <<< FIX: `withOpacity` reemplazado por `withAlpha` (50% = 128) >>>
-        color: colorGrisClaro.withAlpha(128),
+        // Usamos el color de tarjeta del tema
+        color: theme.cardTheme.color,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Center(
@@ -278,7 +279,8 @@ Saludos.
     return Card(
       key: ValueKey(cliente.id),
       elevation: 0,
-      color: colorGrisClaro,
+      // Color dinámico de la tarjeta
+      color: theme.cardTheme.color,
       margin: const EdgeInsets.only(bottom: 8),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: InkWell(
@@ -296,6 +298,7 @@ Saludos.
                       cliente.nombreCliente.isNotEmpty
                           ? cliente.nombreCliente
                           : '(Cliente sin nombre)',
+                      // Usamos bodyLarge del tema que ya tiene el color correcto (blanco/negro)
                       style: theme.textTheme.bodyLarge?.copyWith(
                         fontWeight: FontWeight.w600,
                       ),
@@ -306,7 +309,7 @@ Saludos.
                       Text(
                         cliente.email,
                         style: theme.textTheme.bodyMedium?.copyWith(
-                          color: colorTextoSecundario,
+                          color: Colors.grey,
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -318,7 +321,10 @@ Saludos.
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: colorBlanco,
+                  // Fondo blanco para el icono en modo claro, oscuro sutil en modo oscuro
+                  color: theme.brightness == Brightness.dark
+                      ? Colors.white.withOpacity(0.1)
+                      : Colors.white,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Icon(
