@@ -141,3 +141,8 @@ fastlane/screenshots/**/*.png
 fastlane/test_output
 google-services.json
 GoogleService-Info.plist
+
+# Seguridad y Firmas 
+key.properties
+**/*.jks
+**/*.keystore
