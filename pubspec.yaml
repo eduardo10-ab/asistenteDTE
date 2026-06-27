@@ -51,6 +51,8 @@ dependencies:
   firebase_core: ^4.2.1
   cloud_functions: ^6.0.4
   cloud_firestore: ^6.1.0
+  firebase_auth: ^6.1.0
+  excel: ^4.0.6
 
 dev_dependencies:
   flutter_test:

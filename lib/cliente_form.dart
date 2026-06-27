@@ -117,6 +117,7 @@ class _ClienteFormState extends State<ClienteForm> {
   }
 
   void _guardar() {
+    FocusManager.instance.primaryFocus?.unfocus();
     if (!_formKey.currentState!.validate()) {
       return;
     }
@@ -209,51 +210,63 @@ class _ClienteFormState extends State<ClienteForm> {
                 },
               ),
               const SizedBox(height: 16),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              ExpansionTile(
+                title: Text(
+                  'Datos para Crédito Fiscal',
+                  style: theme.textTheme.bodyMedium,
+                ),
+                tilePadding: EdgeInsets.zero,
+                childrenPadding: const EdgeInsets.only(top: 16),
+                shape: const RoundedRectangleBorder(side: BorderSide.none),
+                collapsedShape: const RoundedRectangleBorder(side: BorderSide.none),
                 children: [
-                  Expanded(
-                    child: _buildTextFormField(
-                      controller: _nitCtrl,
-                      label: 'NIT',
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly,
-                        NitInputFormatter(),
-                      ],
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return null;
-                        }
-                        if (value.length < 17) {
-                          return 'NIT debe tener 14 dígitos';
-                        }
-                        return null;
-                      },
-                    ),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: _buildTextFormField(
+                          controller: _nitCtrl,
+                          label: 'NIT',
+                          keyboardType: TextInputType.number,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                            NitInputFormatter(),
+                          ],
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return null;
+                            }
+                            if (value.length < 17) {
+                              return 'NIT debe tener 14 dígitos';
+                            }
+                            return null;
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: _buildTextFormField(
+                          controller: _nrcCtrl,
+                          label: 'NRC',
+                          keyboardType: TextInputType.number,
+                          inputFormatters: [NrcInputFormatter()],
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: _buildTextFormField(
-                      controller: _nrcCtrl,
-                      label: 'NRC',
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [NrcInputFormatter()],
-                    ),
+                  const SizedBox(height: 16),
+                  _buildTextFormField(
+                    controller: _nombreComercialCtrl,
+                    label: 'Nombre Comercial',
+                    inputFormatters: [NameInputFormatter()],
+                  ),
+                  const SizedBox(height: 16),
+                  _buildAutoComplete(
+                    controller: _actividadEconomicaCtrl,
+                    label: 'Actividad Económica',
+                    options: kActividades,
                   ),
                 ],
-              ),
-              const SizedBox(height: 16),
-              _buildTextFormField(
-                controller: _nombreComercialCtrl,
-                label: 'Nombre Comercial',
-                inputFormatters: [NameInputFormatter()],
-              ),
-              const SizedBox(height: 16),
-              _buildAutoComplete(
-                controller: _actividadEconomicaCtrl,
-                label: 'Actividad Económica',
-                options: kActividades,
               ),
               const SizedBox(height: 16),
               _buildTextFormField(
@@ -335,6 +348,8 @@ class _ClienteFormState extends State<ClienteForm> {
                 ),
                 tilePadding: EdgeInsets.zero,
                 childrenPadding: const EdgeInsets.only(top: 16),
+                shape: const RoundedRectangleBorder(side: BorderSide.none),
+                collapsedShape: const RoundedRectangleBorder(side: BorderSide.none),
                 children: [
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -536,13 +551,7 @@ class _ClienteFormState extends State<ClienteForm> {
         : null;
 
     return DropdownButtonFormField<String>(
-      // <<< FIX: `value` obsoleto reemplazado por `initialValue` >>>
-      // (En este caso, DropdownButtonFormField usa 'value' pero lo marcaba como obsoleto)
-      // La advertencia es un bug conocido del linter; 'value' es correcto aquí.
-      // Lo dejamos como 'value' ya que 'initialValue' no existe en DropdownButtonFormField.
-      // El linter se quejaba de 'value' pero 'initialValue' no es un parámetro válido.
-      // Mantener 'value: currentValue' es la implementación correcta.
-      value: currentValue,
+      initialValue: currentValue,
       items: items
           .map(
             (String item) => DropdownMenuItem(

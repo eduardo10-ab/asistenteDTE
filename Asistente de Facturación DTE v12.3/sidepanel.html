@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Panel Lateral</title>
+    <style>
+        /* --- TUS ESTILOS BASE --- */
+        :root {
+            --background-dark: #1A1B26; --surface-dark: #2A2C3A; --primary-accent: #3E68D9;
+            --primary-hover: #507BEF; --text-primary: #F0F0F0; --text-secondary: #A0A0B0;
+            --border-color: #404258; --action-green: #28a745; --action-teal: #17a2b8; --danger-red: #ff5f5f;
+            --input-bg: #353746; --dropdown-bg: #252733; --dropdown-border: #3a3d4d; --item-text: #eee;
+            --scroll-track: #1A1B26; --scroll-thumb: #404258;
+        }
+
+        :root.light-mode {
+            --background-dark: #F4F6F8; --surface-dark: #FFFFFF; --primary-accent: #3E68D9;
+            --primary-hover: #507BEF; --text-primary: #1F2937; --text-secondary: #4B5563;
+            --border-color: #E5E7EB; --action-green: #28a745; --action-teal: #17a2b8; --danger-red: #ff5f5f;
+            --input-bg: #FFFFFF; --dropdown-bg: #FFFFFF; --dropdown-border: #E5E7EB; --item-text: #1F2937;
+            --scroll-track: #F4F6F8; --scroll-thumb: #CBD5E1;
+        }
+        body {
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+            width: 100%; padding: 15px; background-color: var(--background-dark); color: var(--text-primary);
+            box-sizing: border-box; overflow-x: hidden; 
+        }
+        .section {
+            background-color: var(--surface-dark); padding: 15px; border: 1px solid var(--border-color);
+            border-radius: 8px; margin-bottom: 15px; text-align: left;
+        }
+        h3 {
+            margin-top: 0; margin-bottom: 15px; font-size: 16px; font-weight: 600; 
+            color: var(--text-primary); border-bottom: 1px solid var(--border-color); padding-bottom: 10px;
+        }
+        label { display: block; margin-bottom: 8px; font-weight: 500; font-size: 13px; color: var(--text-secondary); }
+        
+        /* Inputs */
+        input[type="number"], input[type="text"] {
+            width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 4px; 
+            background-color: var(--input-bg); color: var(--text-primary); font-size: 14px; box-sizing: border-box;
+        }
+        input:focus { outline: none; border-color: var(--primary-accent); }
+        .dropdown-input {
+            cursor: pointer; background-image: url('data:image/svg+xml;utf8,<svg fill="%23A0A0B0" height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/></svg>');
+            background-repeat: no-repeat; background-position: right 8px center; padding-right: 30px; text-overflow: ellipsis;
+        }
+        input[readonly].dropdown-input { cursor: pointer; background-color: var(--input-bg); }
+
+        /* Estructura */
+        .custom-select-container { position: relative; width: 100%; margin-bottom: 15px; }
+        .searchable-select { position: relative; flex-grow: 1; width: 100%; min-width: 0; }
+        .input-row { display: flex; gap: 10px; margin-bottom: 15px; align-items: flex-start; position: relative; }
+        #productQuantity { width: 70px !important; text-align: center; flex-shrink: 0; }
+
+        /* Listas Dropdown */
+        .dropdown-content {
+            display: none; position: absolute; top: 100%; left: 0; width: 100%; max-height: 250px; overflow-y: auto;
+            background-color: var(--dropdown-bg); border: 1px solid var(--primary-accent); border-top: none; z-index: 9999; 
+            border-radius: 0 0 6px 6px; box-shadow: 0 8px 20px rgba(0,0,0,0.6); margin-top: 2px;
+        }
+        .dropdown-content.show { display: block; }
+        #customDropdown {
+            top: auto; bottom: 100%; margin-top: 0; margin-bottom: 5px; border-top: 1px solid var(--primary-accent);
+            border-radius: 6px; box-shadow: 0 -5px 20px rgba(0,0,0,0.6); 
+        }
+        .dropdown-item {
+            padding: 10px 12px; cursor: pointer; border-bottom: 1px solid var(--dropdown-border); font-size: 13px; color: var(--item-text);
+            display: flex; align-items: center; gap: 8px; white-space: nowrap; overflow: hidden; 
+        }
+        .dropdown-item:last-child { border-bottom: none; }
+        .dropdown-item:hover { background-color: var(--primary-accent); color: white; }
+        
+        .code-tag {
+            background-color: rgba(62, 104, 217, 0.3); color: #8ab4f8; font-family: monospace; font-weight: bold;
+            padding: 2px 6px; border-radius: 4px; font-size: 11px; flex-shrink: 0;
+        }
+        .name-text { flex-grow: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; min-width: 0; display: block; }
+        .scroll-content { display: inline-block; }
+        .dropdown-item:hover .name-text { text-overflow: clip; }
+        .dropdown-item:hover .scroll-content { animation: marquee 3s linear infinite alternate; }
+        @keyframes marquee { 0% { transform: translateX(0); } 20% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
+        
+        .stock-tag {
+            margin-left: auto; font-size: 11px; color: #A0A0B0; font-weight: bold; flex-shrink: 0;
+            background: rgba(0,0,0,0.2); padding: 2px 4px; border-radius: 3px; z-index: 2; 
+        }
+
+        /* --- BOTONES ACCIÓN (ACTUALIZADO: Animación "Levantar") --- */
+        button {
+            width: 100%; 
+            padding: 10px; 
+            font-size: 15px; 
+            font-weight: 600; 
+            cursor: pointer; 
+            color: white; 
+            border: none; 
+            border-radius: 4px; 
+            /* Propiedades nuevas para la animación */
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        
+        button:hover { 
+            /* Animación al pasar el mouse */
+            filter: brightness(1.1);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        }
+        
+        button:active { 
+            /* Efecto al hacer clic (baja un poco) */
+            transform: translateY(0); 
+            box-shadow: 0 1px 2px rgba(0,0,0,0.2); 
+        }
+
+        #fillClienteBtn { background-color: var(--action-green); }
+        #addProductoBtn { background-color: var(--action-teal); }
+        
+        /* --- FOOTER DIVIDIDO --- */
+        .footer-actions { 
+            display: flex; 
+            justify-content: space-between; /* Grupos a los extremos */
+            align-items: center;
+            margin-top: 25px; 
+            padding-top: 15px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        /* Grupo Izquierdo */
+        .footer-left-group { display: flex; gap: 20px; align-items: center; }
+
+        /* Estilo base de iconos */
+        .footer-icon { 
+            font-size: 24px; color: var(--text-secondary); text-decoration: none; transition: all 0.2s; 
+            cursor: pointer; background: transparent !important; border: none !important; padding: 0 !important; 
+            width: auto !important; display: inline-flex; align-items: center;
+            box-shadow: none !important; /* Quitar sombra de botones generales */
+        }
+        .footer-icon:hover { 
+            color: var(--primary-hover); 
+            transform: scale(1.15) !important; /* Sobrescribir transform general */
+            box-shadow: none !important;
+            background: transparent !important;
+        }
+
+        /* --- BOTÓN SOS --- */
+        #startTourBtn {
+            display: flex;
+            align-items: center; 
+            gap: 8px; /* Separación texto-emoji */
+        }
+        
+        /* Texto "Cancelar ayuda" */
+        .cancel-text {
+            font-size: 11px !important; /* FORZAMOS TAMAÑO PEQUEÑO */
+            font-weight: 600;
+            color: var(--danger-red);
+            white-space: nowrap;
+            /* Se controla con display:none desde JS, pero aseguramos que sea inline */
+        }
+
+        /* Emoji */
+        .emoji-icon {
+            font-size: 24px; 
+            line-height: 1;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: var(--scroll-track); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb { background: var(--scroll-thumb); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--primary-accent); }
+    </style>
+</head>
+<body>
+    <div class="section">
+        <label>Perfil Activo:</label>
+        <div class="custom-select-container">
+            <input type="text" id="profileInput" class="dropdown-input" placeholder="Cargando perfil..." readonly>
+            <div id="profileDropdown" class="dropdown-content"></div>
+        </div>
+    </div>
+
+    <div class="section">
+        <h3>Rellenar Cliente</h3>
+        <div class="custom-select-container">
+            <input type="text" id="clientInput" class="dropdown-input" placeholder="🔍 Buscar Cliente..." autocomplete="off">
+            <div id="clientDropdown" class="dropdown-content"></div>
+        </div>
+        <button id="fillClienteBtn">Aplicar Datos</button>
+    </div>
+
+    <div class="section">
+        <h3>Agregar &Iacute;tem</h3>
+        <div class="input-row">
+            <input type="number" id="productQuantity" value="1" min="1" placeholder="#" title="Cantidad">
+            <div class="searchable-select">
+                <input type="text" id="productInput" class="dropdown-input" placeholder="🔍 Buscar Producto..." autocomplete="off">
+                <div id="customDropdown" class="dropdown-content"></div>
+            </div>
+        </div>
+        <button id="addProductoBtn">Agregar a Factura</button>
+    </div>
+
+    <div class="footer-actions">
+        <div class="footer-left-group">
+            <a href="#" id="sendMailIcon" class="footer-icon" title="Enviar Factura por Correo">📧</a>
+            <a href="options.html" target="_blank" class="footer-icon" title="Ir a Configuración">⚙️</a>
+        </div>
+        
+        <button id="startTourBtn" class="footer-icon" title="Ayuda Interactiva">
+            <span id="sosText" class="cancel-text" style="display: none;">Cancelar ayuda</span>
+            <span id="sosEmoji" class="emoji-icon">🆘</span>
+        </button>
+    </div>
+
+    <script src="popup.js" type="module"></script>
+</body>
+</html>

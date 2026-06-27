@@ -4,7 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'models.dart';
 import 'storage_service.dart';
-import 'main.dart'; // Para colores específicos como azul activo
+import 'package:provider/provider.dart';
+import 'core/ui/app_colors.dart';
 
 class CorreoScreen extends StatefulWidget {
   final ActivationStatus currentStatus;
@@ -15,7 +16,7 @@ class CorreoScreen extends StatefulWidget {
 }
 
 class CorreoScreenState extends State<CorreoScreen> {
-  final StorageService _storage = StorageService();
+  late final StorageService _storage;
   bool _isLoading = true;
   Cliente? _recentClient;
   List<Cliente> _allClients = [];
@@ -26,6 +27,7 @@ class CorreoScreenState extends State<CorreoScreen> {
   @override
   void initState() {
     super.initState();
+    _storage = Provider.of<StorageService>(context, listen: false);
     loadData();
     _searchController.addListener(_onSearchChanged);
   }
@@ -140,7 +142,6 @@ Saludos.
   Widget build(BuildContext context) {
     // Obtenemos el tema actual
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
       // Usamos el color de fondo del tema en lugar de colorBlanco fijo
@@ -323,7 +324,7 @@ Saludos.
                 decoration: BoxDecoration(
                   // Fondo blanco para el icono en modo claro, oscuro sutil en modo oscuro
                   color: theme.brightness == Brightness.dark
-                      ? Colors.white.withOpacity(0.1)
+                      ? Colors.white.withValues(alpha: 0.1)
                       : Colors.white,
                   borderRadius: BorderRadius.circular(8),
                 ),

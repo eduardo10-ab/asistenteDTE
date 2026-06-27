@@ -1,0 +1,1465 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Configuración</title>
+    <style>
+        :root {
+            --background-dark: #1A1B26;
+            --surface-dark: #2A2C3A;
+            --primary-accent: #3E68D9;
+            --primary-hover: #4b7bf5;
+            --text-primary: #F0F0F0;
+            --text-secondary: #A0A0B0;
+            --border-color: #404258;
+            --danger-color: #D9534F;
+            --warning-color: #F0AD4E;
+            --success-color: #28a745;
+            --info-color: #17a2b8;
+            --tab-accent: #428BFF;
+            --tab-text-inactive: #A0A0B0;
+            --input-bg: #353746;
+            --item-bg: #242633;
+            --table-header-bg: #353746;
+            --demo-bg: #222430;
+            --switch-bg: #4a4d5e;
+        }
+
+        :root.light-mode {
+            --background-dark: #F4F6F8;
+            --surface-dark: #FFFFFF;
+            --text-primary: #1F2937;
+            --text-secondary: #4B5563;
+            --border-color: #E5E7EB;
+            --tab-text-inactive: #6B7280;
+            --input-bg: #FFFFFF;
+            --item-bg: #F9FAFB;
+            --table-header-bg: #F3F4F6;
+            --demo-bg: #FFFBEB;
+            --switch-bg: #CBD5E1;
+        }
+
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background-color: var(--background-dark);
+            color: var(--text-primary);
+            margin: 0;
+            padding: 20px;
+        }
+
+        /* --- BOTONES --- */
+        button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 10px 20px;
+            background-color: var(--primary-accent);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        button:hover {
+            background-color: var(--primary-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+            filter: brightness(1.1);
+        }
+
+        button:active {
+            transform: translateY(0);
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+        }
+
+        .theme-toggle-btn {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            padding: 5px;
+            box-shadow: none;
+            z-index: 100;
+            transition: transform 0.2s;
+        }
+
+        .theme-toggle-btn:hover {
+            transform: scale(1.1) !important;
+            box-shadow: none;
+            background: none;
+        }
+
+        #renameProfileBtn {
+            background-color: var(--warning-color);
+        }
+
+        #deleteProfileBtn {
+            background-color: var(--danger-color);
+        }
+
+        #saveCliente,
+        #saveProducto,
+        #activateBtn {
+            background-color: var(--success-color);
+        }
+
+        #cancelCliente,
+        #cancelProducto,
+        #cancelAddProfileBtn {
+            background-color: #6c757d;
+        }
+
+        #exportDataBtn {
+            background-color: #17a2b8;
+        }
+
+        #btnReporte {
+            background-color: var(--success-color);
+        }
+
+        #btnReporteKardex {
+            background-color: var(--info-color);
+        }
+
+        .item-actions button {
+            padding: 6px 10px;
+            font-size: 12px;
+            box-shadow: none;
+        }
+
+        .item-actions button.edit-btn {
+            background-color: var(--warning-color);
+            color: #fff;
+        }
+
+        .item-actions button.delete-btn {
+            background-color: var(--danger-color);
+            color: #fff;
+        }
+
+        input,
+        select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 14px;
+            background-color: var(--input-bg);
+            color: var(--text-primary);
+        }
+
+        /* Estilo específico para los inputs de fecha */
+        input[type="date"] {
+            color-scheme: dark;
+            /* Para que el calendario del navegador sea oscuro */
+            width: auto;
+            min-width: 130px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 4px;
+            font-weight: 500;
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        /* --- LAYOUT --- */
+        .page-container {
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+
+        .main-container {
+            display: flex;
+            gap: 20px;
+            align-items: flex-start;
+        }
+
+        .form-container {
+            flex: 2;
+            min-width: 450px;
+            transition: all 0.3s ease;
+        }
+
+        .list-container {
+            flex: 1;
+            min-width: 300px;
+        }
+
+        .list-container.compact-mode {
+            flex: 0 0 50% !important;
+            max-width: 50% !important;
+        }
+
+        .form-section {
+            background-color: var(--surface-dark);
+            padding: 15px 20px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            margin-bottom: 20px;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            row-gap: 10px;
+        }
+
+        .profile-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            align-items: flex-end;
+        }
+
+        .full-width {
+            grid-column: 1 / -1;
+        }
+
+        .form-divider {
+            display: flex;
+            align-items: center;
+            text-align: center;
+            margin: 15px 0 10px 0;
+            color: var(--text-secondary);
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .form-divider::before,
+        .form-divider::after {
+            content: '';
+            flex: 1;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .form-divider:not(:empty)::before {
+            margin-right: .75em;
+        }
+
+        .form-divider:not(:empty)::after {
+            margin-left: .75em;
+        }
+
+        /* --- TABS --- */
+        .tabs-container {
+            position: relative;
+            background: var(--surface-dark);
+            padding: 0 15px 20px 15px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+            min-width: 240px;
+            margin-bottom: 25px;
+            overflow: hidden;
+        }
+
+        .tabs-container input[name="tab-control"] {
+            display: none;
+        }
+
+        .tabs-container>ul {
+            list-style-type: none;
+            padding-left: 0;
+            display: flex;
+            flex-direction: row;
+            flex-wrap: nowrap;
+            margin-bottom: 0;
+            justify-content: flex-start;
+            align-items: flex-end;
+            border-bottom: 1px solid var(--border-color);
+            width: 100%;
+        }
+
+        .tabs-container li {
+            flex: 1;
+            padding: 0 5px;
+            text-align: center;
+            width: calc((100% - 110px) / 5);
+            transition: width 0.3s ease;
+        }
+
+        .tabs-container li.logo-tab {
+            flex: 0 0 110px;
+            max-width: 110px;
+            min-width: 110px;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding-bottom: 8px;
+        }
+
+        .tabs-container li.logo-tab img {
+            max-width: 100%;
+            height: auto;
+            max-height: 60px;
+            object-fit: contain;
+        }
+
+        .tabs-container label {
+            transition: all 0.2s ease-in-out;
+            color: var(--tab-text-inactive);
+            padding: 15px 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: block;
+            cursor: pointer;
+            white-space: nowrap;
+            user-select: none;
+            font-weight: 700;
+            font-size: 15px;
+        }
+
+        .tabs-container label:hover {
+            color: #fff;
+        }
+
+        .tabs-container label:hover svg {
+            fill: #fff;
+        }
+
+        .tabs-container svg {
+            fill: var(--tab-text-inactive);
+            height: 1.6em;
+            width: 1.6em;
+            vertical-align: middle;
+            margin-right: 0.6em;
+            transition: all 0.2s ease-in-out;
+            margin-bottom: 3px;
+        }
+
+        .tabs-container .slider {
+            position: relative;
+            width: calc((100% - 110px) / 5);
+            margin-left: 110px;
+            transition: all 0.33s cubic-bezier(0.38, 0.8, 0.32, 1.07);
+            margin-top: -3px;
+            z-index: 1;
+        }
+
+        .tabs-container .slider .indicator {
+            position: relative;
+            width: 100%;
+            max-width: 100%;
+            margin: 0 auto;
+            height: 3px;
+            background: var(--tab-accent);
+            box-shadow: 0 0 10px rgba(66, 139, 255, 0.7);
+        }
+
+        .tabs-container .content {
+            margin-top: 25px;
+            width: 100%;
+        }
+
+        .tabs-container .content section {
+            display: none;
+            animation: content-fade 0.3s ease-in-out;
+            width: 100%;
+        }
+
+        #tab1:checked~ul>li:nth-child(2) label {
+            color: var(--tab-accent);
+        }
+
+        #tab1:checked~ul>li:nth-child(2) label svg {
+            fill: var(--tab-accent);
+        }
+
+        #tab1:checked~.slider {
+            transform: translateX(0%);
+        }
+
+        #tab1:checked~.content>section:nth-child(1) {
+            display: block;
+        }
+
+        #tab2:checked~ul>li:nth-child(3) label {
+            color: var(--tab-accent);
+        }
+
+        #tab2:checked~ul>li:nth-child(3) label svg {
+            fill: var(--tab-accent);
+        }
+
+        #tab2:checked~.slider {
+            transform: translateX(100%);
+        }
+
+        #tab2:checked~.content>section:nth-child(2) {
+            display: block;
+        }
+
+        #tab3:checked~ul>li:nth-child(4) label {
+            color: var(--tab-accent);
+        }
+
+        #tab3:checked~ul>li:nth-child(4) label svg {
+            fill: var(--tab-accent);
+        }
+
+        #tab3:checked~.slider {
+            transform: translateX(200%);
+        }
+
+        #tab3:checked~.content>section:nth-child(3) {
+            display: block;
+        }
+
+        #tab4:checked~ul>li:nth-child(5) label {
+            color: var(--tab-accent);
+        }
+
+        #tab4:checked~ul>li:nth-child(5) label svg {
+            fill: var(--tab-accent);
+        }
+
+        #tab4:checked~.slider {
+            transform: translateX(300%);
+        }
+
+        #tab4:checked~.content>section:nth-child(4) {
+            display: block;
+        }
+
+        #tab5:checked~ul>li:nth-child(6) label {
+            color: var(--tab-accent);
+        }
+
+        #tab5:checked~ul>li:nth-child(6) label svg {
+            fill: var(--tab-accent);
+        }
+
+        #tab5:checked~.slider {
+            transform: translateX(400%);
+        }
+
+        #tab5:checked~.content>section:nth-child(5) {
+            display: block;
+        }
+
+        @keyframes content-fade {
+            from {
+                opacity: 0;
+                transform: translateY(5px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0%);
+            }
+        }
+
+        .tabs-container.inventory-disabled li {
+            width: calc((100% - 110px) / 4);
+        }
+
+        .tabs-container.inventory-disabled .slider {
+            width: calc((100% - 110px) / 4);
+        }
+
+        .tabs-container.inventory-disabled #tab1:checked~.slider {
+            transform: translateX(0%);
+        }
+
+        .tabs-container.inventory-disabled #tab2:checked~.slider {
+            transform: translateX(100%);
+        }
+
+        .tabs-container.inventory-disabled #tab4:checked~.slider {
+            transform: translateX(200%);
+        }
+
+        .tabs-container.inventory-disabled #tab5:checked~.slider {
+            transform: translateX(300%);
+        }
+
+        h1 {
+            font-size: 22px;
+            font-weight: 600;
+            color: var(--text-primary);
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 10px;
+            margin-top: 0;
+        }
+
+        h2 {
+            font-size: 16px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-secondary);
+            margin-bottom: 15px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 8px;
+            margin-top: 0;
+        }
+
+        #licenseSection {
+            background-color: var(--surface-dark);
+            padding: 30px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            max-width: 500px;
+            margin: 50px auto;
+            text-align: center;
+        }
+
+        #licenseSection h2 {
+            margin-top: 0;
+            color: var(--text-primary);
+        }
+
+        .demo-instructions {
+            background-color: var(--demo-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 20px;
+            text-align: left;
+            font-size: 0.9em;
+            color: var(--text-secondary);
+        }
+
+        .demo-instructions strong {
+            color: var(--primary-accent);
+        }
+
+        .demo-instructions code {
+            background-color: #404258;
+            padding: 2px 6px;
+            border-radius: 4px;
+            color: #fff;
+            font-family: monospace;
+            font-size: 1.1em;
+        }
+
+        #licenseKeyInput {
+            margin-bottom: 20px;
+            text-align: center;
+            font-size: 16px;
+        }
+
+        #activateBtn {
+            width: 100%;
+        }
+
+        #licenseError {
+            color: var(--danger-color);
+            margin-top: 15px;
+            font-weight: 500;
+        }
+
+        #exportDataBtn,
+        #importDataBtn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        #exportDataBtn img,
+        #importDataBtn img {
+            width: 16px;
+            height: 16px;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        #addProfileContainer {
+            display: flex;
+            gap: 10px;
+            align-items: flex-end;
+        }
+
+        #newProfileInputGroup {
+            width: calc(50% - 9px);
+            flex-shrink: 0;
+        }
+
+        #addProfileBtn {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        #addProfileBtn img {
+            width: 30px;
+            height: 30px;
+        }
+
+        #addProfileBtn.initial-state {
+            background-color: #071F84 !important;
+            color: white;
+        }
+
+        #addProfileBtn.adding-state {
+            background-color: var(--primary-accent) !important;
+            color: white;
+        }
+
+        .item-list {
+            display: block !important;
+            list-style: none;
+            padding: 0 !important;
+            max-height: 550px;
+            overflow-y: auto;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background-color: var(--item-bg);
+        }
+
+        .item-list li {
+            display: flex !important;
+            justify-content: space-between !important;
+            align-items: center !important;
+            padding: 10px 14px !important;
+            border: none !important;
+            border-bottom: 1px solid var(--border-color) !important;
+            border-radius: 0 !important;
+            margin: 0 !important;
+            background-color: transparent !important;
+            transition: background-color 0.2s;
+            width: 100% !important;
+            box-sizing: border-box !important;
+        }
+
+        .item-list li:last-child {
+            border-bottom: none !important;
+        }
+
+        .item-list li:hover {
+            background-color: rgba(62, 104, 217, 0.1) !important;
+        }
+
+        .item-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .toggle-container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background-color: var(--surface-dark);
+            padding: 10px 15px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            margin-bottom: 15px;
+            max-width: 350px;
+            height: 42px;
+        }
+
+        .switch-wrapper {
+            display: flex;
+            align-items: center;
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 48px;
+            height: 26px;
+            margin-left: 10px;
+            flex-shrink: 0;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider-switch {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: var(--switch-bg);
+            transition: .3s;
+            border-radius: 34px;
+        }
+
+        .slider-switch:before {
+            position: absolute;
+            content: "";
+            height: 20px;
+            width: 20px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .3s;
+            border-radius: 50%;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        input:checked+.slider-switch {
+            background-color: var(--success-color);
+        }
+
+        input:checked+.slider-switch:before {
+            transform: translateX(22px);
+        }
+
+        .toggle-label {
+            font-weight: 500;
+            color: var(--text-primary);
+            font-size: 13px;
+        }
+
+        .inventory-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        .inventory-table th,
+        .inventory-table td {
+            text-align: left;
+            padding: 10px;
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-primary);
+            font-size: 14px;
+        }
+
+        .inventory-table th {
+            background-color: var(--table-header-bg);
+            font-weight: 600;
+            font-size: 13px;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+        }
+
+        .stock-badge {
+            padding: 3px 6px;
+            border-radius: 3px;
+            font-weight: bold;
+            font-size: 11px;
+        }
+
+        .stock-ok {
+            background-color: rgba(40, 167, 69, 0.2);
+            color: #28a745;
+        }
+
+        .stock-low {
+            background-color: rgba(240, 173, 78, 0.2);
+            color: #F0AD4E;
+        }
+
+        .stock-out {
+            background-color: rgba(217, 83, 79, 0.2);
+            color: #D9534F;
+        }
+
+        .report-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .report-controls select {
+            padding: 8px;
+            border-radius: 6px;
+            width: auto;
+            background-color: var(--input-bg);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            cursor: pointer;
+        }
+
+        /* Contenedor para las fechas personalizadas */
+        .date-range-container {
+            display: none;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .date-range-container.active {
+            display: flex;
+        }
+
+        .history-table-container {
+            max-height: 500px;
+            overflow-y: auto;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+        }
+
+        .history-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .history-table th {
+            position: sticky;
+            top: 0;
+            background-color: var(--table-header-bg);
+            z-index: 10;
+        }
+
+        .history-table th,
+        .history-table td {
+            padding: 10px;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 13px;
+            text-align: left;
+        }
+
+        .badge-enviado {
+            background-color: #28a745;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 10px;
+            font-weight: bold;
+        }
+
+        .total-row {
+            font-weight: bold;
+            background-color: var(--table-header-bg);
+            color: var(--success-color);
+        }
+
+        .tag-entrada {
+            background-color: rgba(40, 167, 69, 0.2);
+            color: #28a745;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: bold;
+        }
+
+        .tag-salida {
+            background-color: rgba(217, 83, 79, 0.2);
+            color: #D9534F;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: bold;
+        }
+
+        .ref-code {
+            font-family: monospace;
+            color: #17a2b8;
+            background-color: rgba(23, 162, 184, 0.1);
+            padding: 2px 4px;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="licenseSection" style="display: none;">
+        <h2>Activación de la Extensión</h2>
+        <p>Por favor, introduce tu clave de licencia para comenzar.</p>
+
+        <div class="demo-instructions">
+            <p style="margin-top: 0; margin-bottom: 15px;">Puedes probar la extensión haciendo clic en cualquiera de las siguientes opciones:</p>
+            <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px;">
+                <button id="btnUsarDemoEstandar" style="background-color: var(--primary-accent); width: 100%; margin: 0;">
+                    🚀 Utilizar Versión Demo
+                </button>
+                <button id="btnUsarDemoInv" style="background-color: var(--info-color); width: 100%; margin: 0;">
+                    📦 Utilizar Versión Demo (Con Inventario)
+                </button>
+            </div>
+            <div>
+                <h2 style="font-size: 13px; text-transform: none; margin-top: 15px; border: none; padding: 0;">Si usted ya tenía una clave de activación asignada comuníquese con el proveedor para que se le asigne una nueva: David Gálvez - 7727-8551</h2>
+            </div>
+        </div>
+
+        <input type="text" id="licenseKeyInput" placeholder="Introduce tu clave aquí...">
+        <button id="activateBtn">Activar</button>
+        <p id="licenseError" style="display: none;">La clave introducida es incorrecta.</p>
+    </div>
+
+    <div id="mainContent" style="display: none;">
+        <div class="page-container" style="position: relative;">
+            <button id="btnToggleTheme" class="theme-toggle-btn" title="Alternar Tema">
+                <span id="themeIcon">☀️</span>
+            </button>
+
+            <div class="tabs-container" id="mainTabs">
+                <input type="radio" id="tab1" name="tab-control" checked>
+                <input type="radio" id="tab2" name="tab-control">
+                <input type="radio" id="tab3" name="tab-control">
+                <input type="radio" id="tab4" name="tab-control">
+                <input type="radio" id="tab5" name="tab-control">
+
+                <ul>
+                    <li class="logo-tab">
+                        <img src="icons/logo.png" alt="Logo">
+                    </li>
+                    <li title="Clientes">
+                        <label for="tab1" role="button">
+                            <svg viewBox="0 0 24 24">
+                                <path
+                                    d="M12,4A4,4 0 0,1 16,8A4,4 0 0,1 12,12A4,4 0 0,1 8,8A4,4 0 0,1 12,4M12,14C16.42,14 20,15.79 20,18V20H4V18C4,15.79 7.58,14 12,14Z" />
+                            </svg>
+                            <span>Clientes</span>
+                        </label>
+                    </li>
+                    <li title="Productos">
+                        <label for="tab2" role="button">
+                            <svg viewBox="0 0 24 24">
+                                <path
+                                    d="M20,9L12,5L4,9L12,13L20,9M12,21L4,17V11L12,15L20,11V17L12,21M12,3L22,8V18L12,23L2,18V8L12,3Z" />
+                            </svg>
+                            <span>Productos</span>
+                        </label>
+                    </li>
+                    <li title="Inventario" id="tab-inventory-li">
+                        <label for="tab3" role="button">
+                            <svg viewBox="0 0 24 24">
+                                <path d="M3,22V8H7V22H3M10,22V2H14V22H10M17,22V14H21V22H17Z" />
+                            </svg>
+                            <span>Inventario</span>
+                        </label>
+                    </li>
+                    <li title="Historial">
+                        <label for="tab4" role="button">
+                            <svg viewBox="0 0 24 24">
+                                <path
+                                    d="M13.5,8H12V13L16.28,15.54L17,14.33L13.5,12.25V8M13,3A9,9 0 0,0 4,12H1L4.96,16.03L9,12H6A7,7 0 0,1 13,5A7,7 0 0,1 20,12A7,7 0 0,1 13,19C11.07,19 9.32,18.21 8.06,16.94L6.64,18.36C8.27,20 10.5,21 13,21A9,9 0 0,0 22,12A9,9 0 0,0 13,3Z" />
+                            </svg>
+                            <span>Facturación</span>
+                        </label>
+                    </li>
+                    <li title="Compras">
+                        <label for="tab5" role="button">
+                            <svg viewBox="0 0 24 24">
+                                <path
+                                    d="M17,18A2,2 0 0,1 19,20A2,2 0 0,1 17,22C15.89,22 15,21.1 15,20C15,18.89 15.89,18 17,18M1,2V4H3L6.6,11.59L5.24,14.04C5.09,14.32 5,14.65 5,15A2,2 0 0,0 7,17H19V15H7.42A0.25,0.25 0 0,1 7.17,14.75L7.2,14.63L8.1,13H15.55C16.3,13 16.96,12.58 17.3,11.97L20.88,5.5C20.95,5.34 21,5.17 21,5A1,1 0 0,0 20,4H5.21L4.27,2M7,18A2,2 0 0,1 9,20A2,2 0 0,1 7,22C5.89,22 5,21.1 5,20C5,18.89 5.89,18 7,18Z" />
+                            </svg>
+                            <span>Compras</span>
+                        </label>
+                    </li>
+                </ul>
+
+                <div class="slider">
+                    <div class="indicator"></div>
+                </div>
+
+                <div class="content">
+
+                    <section>
+                        <div id="clientes">
+                            <div class="form-section">
+                                <h2>Gestión de Perfiles</h2>
+                                <div id="demo-limit-message"
+                                    style="color: var(--warning-color); font-weight: bold; text-align: center; margin-bottom: 15px; display: none; flex-direction: column; gap: 10px; align-items: center; padding: 10px; border: 1px solid var(--warning-color); border-radius: 8px; background-color: #3e3c32;">
+                                    <span>MODO DEMO ACTIVADO: Límite de 2 Perfiles, 2 clientes y 2 productos.<br>Para
+                                        contratar la versión PRO contacte a: David Gálvez - 7727-8551</span>
+                                    <button id="upgradeToProBtn">✨ Actualizar a PRO</button>
+                                </div>
+
+                                <div class="profile-grid">
+                                    <div>
+                                        <label for="profileSelector">Perfil Activo:</label>
+                                        <select id="profileSelector"></select>
+                                    </div>
+                                    <div class="button-group" style="margin-top: 0;">
+                                        <button id="renameProfileBtn">Renombrar</button>
+                                        <button id="deleteProfileBtn">Eliminar Perfil</button>
+                                    </div>
+                                    <div class="full-width" id="addProfileContainer">
+                                        <div id="newProfileInputGroup" style="display: none;">
+                                            <label for="newProfileName">Nombre del Nuevo Perfil:</label>
+                                            <input type="text" id="newProfileName" placeholder="Ej: Mi Empresa">
+                                        </div>
+                                        <button id="addProfileBtn" class="initial-state">
+                                            <img src="icons/agregar-usuario.png" alt=""
+                                                style="width:20px;height:20px;vertical-align:middle;">
+                                            <span>Crear Nuevo Perfil</span>
+                                        </button>
+                                        <button id="cancelAddProfileBtn" style="display: none;">Cancelar</button>
+                                    </div>
+                                    <div class="button-group full-width"
+                                        style="margin-top: 20px; border-top: 1px solid var(--border-color); padding-top: 20px;">
+                                        <button id="exportDataBtn">
+                                            <img src="icons/export-icon.png" alt=""> Guardar Copia de Seguridad
+                                        </button>
+                                        <button id="importDataBtn" style="background-color: var(--success-color);">
+                                            <img src="icons/import-icon.png" alt=""> Importar Copia de Seguridad
+                                        </button>
+                                    </div>
+                                    <input type="file" id="importFileInput" accept=".json" style="display: none;">
+                                </div>
+                            </div>
+
+                            <h1>Directorio de Clientes</h1>
+
+                            <div style="margin-bottom: 25px;">
+                                <button id="toggleClientFormBtn" style="width: auto;">
+                                    <img src="icons/agregar-cliente.png" alt="" style="width: 30px; height: 30px;">
+                                    <span>Nuevo Cliente</span>
+                                </button>
+                            </div>
+
+                            <div class="main-container" id="client-management-container">
+                                <div class="form-container" style="display: none;">
+                                    <div class="form-section">
+                                        <h2 id="clienteFormTitle">Agregar Nuevo Cliente</h2>
+                                        <input type="hidden" id="clientId">
+                                        <div class="form-grid">
+                                            <div class="full-width"><label for="nombreCliente">Nombre del
+                                                    Cliente:</label><input type="text" id="nombreCliente"></div>
+                                            <div><label for="nit">NIT:</label><input type="text" id="nit"></div>
+                                            <div><label for="nrc">NRC:</label><input type="text" id="nrc"></div>
+                                            <div><label for="dui">DUI:</label><input type="text" id="dui"></div>
+                                            <div><label for="pasaporte">Pasaporte:</label><input type="text"
+                                                    id="pasaporte"></div>
+                                            <div><label for="carnetResidente">Carnet de Residente:</label><input
+                                                    type="text" id="carnetResidente"></div>
+                                            <div><label for="otroDocumento">Otro Documento:</label><input type="text"
+                                                    id="otroDocumento"></div>
+                                            <div class="full-width"><label for="nombreComercial">Nombre
+                                                    Comercial:</label><input type="text" id="nombreComercial"></div>
+
+                                            <div class="full-width">
+                                                <label for="actividadEconomicaInput">Actividad Econ&oacute;mica:</label>
+                                                <input type="text" id="actividadEconomicaInput" list="actividadesList"
+                                                    placeholder="Escribe para buscar...">
+                                                <datalist id="actividadesList"></datalist>
+                                            </div>
+
+                                            <div>
+                                                <label for="departamentoInput">Departamento:</label>
+                                                <input type="text" id="departamentoInput" list="departamentosList"
+                                                    placeholder="Selecciona un departamento">
+                                                <datalist id="departamentosList"></datalist>
+                                            </div>
+                                            <div>
+                                                <label for="municipioInput">Municipio:</label>
+                                                <input type="text" id="municipioInput" list="municipiosList"
+                                                    placeholder="Selecciona un municipio">
+                                                <datalist id="municipiosList"></datalist>
+                                            </div>
+
+                                            <div class="full-width"><label for="direccion">Direcci&oacute;n
+                                                    Complemento:</label><input type="text" id="direccion"></div>
+                                            <div><label for="email">Correo electr&oacute;nico:</label><input
+                                                    type="email" id="email"></div>
+                                            <div><label for="telefono">Tel&eacute;fono:</label><input type="tel"
+                                                    id="telefono"></div>
+                                            <div class="form-divider full-width">Para Factura de Exportación</div>
+                                            <div>
+                                                <label for="tipoPersona">Tipo Persona:</label>
+                                                <select id="tipoPersona">
+                                                    <option value="NATURAL">Persona Natural</option>
+                                                    <option value="JURÍDICA">Persona Jurídica</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label for="paisInput">País:</label>
+                                                <input type="text" id="paisInput" list="paisesList"
+                                                    placeholder="Selecciona un país" value="EL SALVADOR">
+                                                <datalist id="paisesList"></datalist>
+                                            </div>
+                                        </div>
+                                        <div class="button-group">
+                                            <button id="saveCliente">Guardar Cliente</button>
+                                            <button id="cancelCliente" style="display:inline-block;">Cancelar</button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="list-container">
+                                    <h2>Clientes Guardados</h2>
+                                    <ul id="clientList" class="item-list"></ul>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section>
+                        <div id="productos">
+                            <h1>Cat&aacute;logo de Productos y Servicios</h1>
+
+                            <div class="toggle-container" id="inventoryToggleContainer">
+                                <span class="toggle-label">Habilitar Control de Inventario</span>
+                                <div class="switch-wrapper">
+                                    <label class="switch">
+                                        <input type="checkbox" id="inventoryToggle" checked>
+                                        <span class="slider-switch round"></span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="main-container">
+                                <div class="form-container">
+                                    <div class="form-section">
+                                        <h2 id="productoFormTitle">Agregar Nuevo &Iacute;tem</h2>
+                                        <input type="hidden" id="productoId">
+                                        <div class="form-grid">
+                                            <div class="full-width">
+                                                <label for="codigoProducto">Código de Producto / SKU:</label>
+                                                <input type="text" id="codigoProducto"
+                                                    placeholder="Ej: PROD-001 (Opcional pero recomendado)">
+                                            </div>
+
+                                            <div><label for="tipo">Tipo:</label><select id="tipo">
+                                                    <option value="Bien">Bien</option>
+                                                    <option value="Servicio">Servicio</option>
+                                                    <option value="Bien y Servicio">Bien y Servicio</option>
+                                                </select></div>
+                                            <div><label for="unidadMedida">Unidad de Medida:</label><select
+                                                    id="unidadMedida">
+                                                    <option value="1">Metro</option>
+                                                    <option value="2">Yarda</option>
+                                                    <option value="6">Milímetro</option>
+                                                    <option value="9">Kilómetro cuadrado</option>
+                                                    <option value="10">Hectárea</option>
+                                                    <option value="13">Metro cuadrado</option>
+                                                    <option value="15">Vara cuadrada</option>
+                                                    <option value="18">Metro cúbico</option>
+                                                    <option value="20">Barril</option>
+                                                    <option value="22">Galón</option>
+                                                    <option value="23">Litro</option>
+                                                    <option value="24">Botella</option>
+                                                    <option value="26">Mililitro</option>
+                                                    <option value="30">Tonelada</option>
+                                                    <option value="32">Quintal</option>
+                                                    <option value="33">Arroba</option>
+                                                    <option value="34">Kilogramo</option>
+                                                    <option value="36">Libra</option>
+                                                    <option value="37">Onza Troy</option>
+                                                    <option value="38">Onza</option>
+                                                    <option value="39">Gramo</option>
+                                                    <option value="40">Miligramo</option>
+                                                    <option value="42">Megawatt</option>
+                                                    <option value="43">Kilowatt</option>
+                                                    <option value="44">Watt</option>
+                                                    <option value="45">Megavoltio-amperio</option>
+                                                    <option value="46">Kilovoltio-amperio</option>
+                                                    <option value="47">Voltio-amperio</option>
+                                                    <option value="49">Gigawatt-hora</option>
+                                                    <option value="50">Megawatt-hora</option>
+                                                    <option value="51">Kilowatt-hora</option>
+                                                    <option value="52">Watt-hora</option>
+                                                    <option value="53">Kilovoltio</option>
+                                                    <option value="54">Voltio</option>
+                                                    <option value="55">Millar</option>
+                                                    <option value="56">Medio millar</option>
+                                                    <option value="57">Ciento</option>
+                                                    <option value="58">Docena</option>
+                                                    <option value="59" selected>Unidad</option>
+                                                    <option value="99">Otra</option>
+                                                </select></div>
+                                            <div class="full-width"><label for="descripcion">Producto o
+                                                    Servicio:</label><input type="text" id="descripcion"></div>
+                                            <div class="full-width"><label for="precio">Precio Unitario (Sin IVA en caso
+                                                    sea CCF):</label><input type="number" id="precio" step="0.01"
+                                                    placeholder="Ej: 15.00"></div>
+                                            <div class="full-width" id="stockInputContainer"><label
+                                                    for="stock">Existencias (Inventario):</label><input type="number"
+                                                    id="stock" step="1" placeholder="Ej: 100" value="0"></div>
+                                        </div>
+                                        <div class="button-group"><button id="saveProducto">Guardar
+                                                &Iacute;tem</button><button id="cancelProducto"
+                                                style="display:none;">Cancelar</button></div>
+                                    </div>
+                                </div>
+                                <div class="list-container">
+                                    <h2>Productos y Servicios Guardados</h2>
+                                    <ul id="productList" class="item-list"></ul>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section>
+                        <div id="inventario">
+                            <div
+                                style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                                <h1 style="margin:0; border:none;">Gestión de Inventario</h1>
+                                <div class="report-controls">
+                                    <select id="reportPeriod">
+                                        <option value="today">📅 Hoy</option>
+                                        <option value="week">📆 Esta Semana</option>
+                                        <option value="month">🗓️ Este Mes</option>
+                                        <option value="custom">📅 Personalizado</option>
+                                    </select>
+
+                                    <div id="invDateRange" class="date-range-container">
+                                        <input type="date" id="invStartDate">
+                                        <span style="color:#A0A0B0">-</span>
+                                        <input type="date" id="invEndDate">
+                                    </div>
+
+                                    <button id="btnReporte"><span>📊 Reporte de Inventario</span></button>
+                                    <button id="btnReporteKardex"><span>📑 Reporte Kardex</span></button>
+                                </div>
+                            </div>
+
+                            <div class="form-section">
+                                <h3 style="margin-top:0; border-bottom:1px solid #404258; padding-bottom:10px;">📦
+                                    Estado Actual del Stock</h3>
+                                <p style="color:var(--text-secondary); font-size:13px; margin-bottom:15px;">Aquí puedes
+                                    ver las existencias disponibles en tiempo real.</p>
+                                <table class="inventory-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Producto</th>
+                                            <th>Tipo</th>
+                                            <th>Precio</th>
+                                            <th>Existencias</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="inventoryTableBody"></tbody>
+                                </table>
+                            </div>
+
+                            <div class="form-section" style="margin-top: 20px;">
+                                <h3 style="margin-top:0; border-bottom:1px solid #404258; padding-bottom:10px;">📜
+                                    Registro de Inventario (Entradas y Salidas)</h3>
+                                <p style="color:var(--text-secondary); font-size:13px; margin-bottom:15px;">
+                                    Registro detallado de movimientos. Las ventas automáticas mostrarán el
+                                    <strong>Código de Generación</strong> de la factura.
+                                </p>
+                                <div class="history-table-container">
+                                    <table class="history-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Fecha</th>
+                                                <th>Tipo</th>
+                                                <th>Producto</th>
+                                                <th>Cant.</th>
+                                                <th>Referencia (DTE / Origen)</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="inventoryLogTableBody">
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section>
+                        <div id="historial">
+                            <div
+                                style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                                <h1 style="border:none; margin:0;">Historial de Facturación</h1>
+                            </div>
+                            <div class="report-controls"
+                                style="background-color: var(--surface-dark); padding: 15px; border-radius: 8px; border: 1px solid var(--border-color); margin-bottom: 20px; justify-content: space-between;">
+                                <input type="text" id="searchHistoryInput" placeholder="Buscar cliente o código..."
+                                    style="width: 300px;">
+                                <div style="display: flex; gap: 15px; align-items: center;">
+                                    <div style="display: flex; align-items: center; gap: 10px;">
+                                        <label style="margin:0; white-space: nowrap;">Filtrar:</label>
+                                        <select id="salesReportPeriod">
+                                            <option value="all">📅 Todo el Historial</option>
+                                            <option value="today">📅 Hoy</option>
+                                            <option value="week">📅 Esta Semana</option>
+                                            <option value="month">📅 Este Mes</option>
+                                            <option value="custom">📅 Personalizado</option>
+                                        </select>
+
+                                        <div id="histDateRange" class="date-range-container">
+                                            <input type="date" id="histStartDate">
+                                            <span style="color:#A0A0B0">-</span>
+                                            <input type="date" id="histEndDate">
+                                        </div>
+                                    </div>
+                                    <button id="btnReporteVentas" style="background-color: #28a745;">📥 Reporte de
+                                        Ventas</button>
+                                </div>
+                            </div>
+                            <div class="history-table-container">
+                                <table class="history-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Fecha</th>
+                                            <th>Hora</th>
+                                            <th>Tipo</th>
+                                            <th>Cód. de Generación</th>
+                                            <th>N# de Control</th>
+                                            <th>Cliente</th>
+                                            <th style="text-align: right;">Total</th>
+                                            <th>Estado</th>
+                                            <th style="text-align: center;">Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="historyTableBody"></tbody>
+                                    <tfoot>
+                                        <tr class="total-row">
+                                            <td colspan="6" style="text-align: right;">TOTAL ACUMULADO:</td>
+                                            <td id="historyTotalSum" style="text-align: right;">$0.00</td>
+                                            <td colspan="2"></td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                        </div>
+                    </section>
+                    <section>
+                        <div id="comprasHistorial">
+                            <div
+                                style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                                <h1 style="border:none; margin:0;">Historial de Compras</h1>
+                            </div>
+                            <div class="report-controls"
+                                style="background-color: var(--surface-dark); padding: 15px; border-radius: 8px; border: 1px solid var(--border-color); margin-bottom: 20px; flex-direction: column; gap: 15px;">
+                                <div
+                                    style="background-color: rgba(240, 173, 78, 0.15); border: 1px solid var(--warning-color); padding: 10px 15px; border-radius: 6px; width: 100%; box-sizing: border-box; display: flex; gap: 10px; align-items: center;">
+                                    <span style="font-size: 18px;">🚧</span>
+                                    <span style="color: var(--warning-color); font-size: 13px; margin: 0;"><strong>Función
+                                            Beta:</strong> Esta funcionalidad se encuentra en fase experimental y de
+                                        pruebas. Puede presentar errores o comportamiento inesperado.</span>
+                                </div>
+                                <p style="margin: 0; color: var(--text-secondary); width: 100%;">Lee correos de tu
+                                    bandeja de entrada de Gmail buscando facturas (archivos .json) y las clasifica aquí
+                                    automáticamente.</p>
+                                <div
+                                    style="display: flex; gap: 15px; align-items: center; justify-content: space-between; width: 100%;">
+                                    <div style="display: flex; align-items: center; gap: 10px;">
+                                        <label style="margin:0; white-space: nowrap;">Filtrar / Sincronizar por:</label>
+                                        <select id="comprasReportPeriod">
+                                            <option value="today">📅 Hoy</option>
+                                            <option value="week">📅 Esta Semana</option>
+                                            <option value="month" selected>📅 Este Mes</option>
+                                            <option value="custom">📅 Personalizado</option>
+                                        </select>
+
+                                        <div id="comprasDateRange" class="date-range-container">
+                                            <input type="date" id="comprasStartDate">
+                                            <span style="color:#A0A0B0">-</span>
+                                            <input type="date" id="comprasEndDate">
+                                        </div>
+                                    </div>
+                                    <div style="display: flex; gap: 10px; align-items: center; justify-content: flex-end;">
+                                        <span id="labelGmailAccount" style="color: var(--text-secondary); font-size: 13px; font-weight: 600; margin-right: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="Cuenta Sincronizada"></span>
+                                        <button id="btnSwitchAccount"
+                                            style="background-color: transparent; border: 1px solid var(--text-secondary); color: var(--text-secondary); padding: 8px 12px; border-radius: 6px;"
+                                            title="Cambiar cuenta de Gmail">
+                                            👤 Cambiar Cuenta
+                                        </button>
+                                        <button id="btnClearCompras"
+                                            style="background-color: transparent; border: 1px solid var(--danger-color); color: var(--danger-color); padding: 8px 12px; border-radius: 6px;"
+                                            title="Limpiar historial de compras">
+                                            🗑️
+                                        </button>
+                                        <button id="btnSyncCompras"
+                                            style="background-color: var(--primary-accent); white-space: nowrap;">
+                                            Sincronizar Gmail
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div
+                                style="background-color: rgba(62, 104, 217, 0.15); border: 1px solid var(--primary-accent); padding: 15px; border-radius: 8px; margin-bottom: 20px; font-size: 13px;">
+                                <h4
+                                    style="margin-top: 0; margin-bottom: 10px; color: var(--tab-accent); font-size: 14px;">
+                                    🔑 Pasos para iniciar sesión y sincronizar correos:</h4>
+                                <div
+                                    style="display: flex; flex-direction: column; gap: 6px; color: var(--text-primary); line-height: 1.5; text-align: left;">
+                                    <div><strong>1.</strong> Haz clic en el botón <strong
+                                            style="color: var(--primary-accent)">Sincronizar Gmail</strong> (o en 👤
+                                        Cambiar Cuenta).</div>
+                                    <div><strong>2.</strong> Selecciona tu cuenta de Google para dar permiso a la
+                                        extensión de leer las facturas.</div>
+                                    <div><strong>3.</strong> Si te aparece una advertencia de seguridad de Google, haz
+                                        clic en <strong>Avanzado</strong>.</div>
+                                    <div><strong>4.</strong> Luego haz clic en <strong>Ir a Asistente DTE (no
+                                            seguro)</strong> en la parte inferior, y por último en
+                                        <strong>Continuar</strong> para aceptar los permisos.</div>
+                                </div>
+                            </div>
+
+                            <div class="history-table-container">
+                                <table class="history-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Fecha</th>
+                                            <th style="width: 80px;">Tipo</th>
+                                            <th>Proveedor</th>
+                                            <th>NIT/NRC</th>
+                                            <th>Código de Generación</th>
+                                            <th style="text-align: right;">Total</th>
+                                            <th style="text-align: center;">Archivos</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="comprasTableBody">
+                                        <tr>
+                                            <td colspan="7"
+                                                style="text-align:center; padding: 20px; color: var(--text-secondary);">
+                                                Para cargar las compras, sigue las instrucciones de arriba y haz clic en
+                                                <strong>Sincronizar Gmail</strong>.</td>
+                                        </tr>
+                                    </tbody>
+                                    <tfoot>
+                                        <tr class="total-row">
+                                            <td colspan="5" style="text-align: right;">TOTAL COMPRAS:</td>
+                                            <td id="comprasTotalSum" style="text-align: right;">$0.00</td>
+                                            <td></td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+            </div>
+            <div
+                style="margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--border-color); text-align: center; color: var(--text-secondary); font-size: 13px;">
+
+            </div>
+
+
+
+            <div class="mt-4 border-top pt-3">
+                <h5 class="text-muted" style="color: var(--text-primary); margin-bottom: 10px;">⚙️ Otras opciones</h5>
+                <div
+                    style="margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border-color); display: flex; align-items: center;">
+                    <button id="btnCambiarClave"
+                        style="background-color: transparent; border: 1px solid var(--warning-color); color: var(--warning-color); border-radius: 4px; cursor: pointer; padding: 4px 12px; font-size: 14px; box-shadow: none;"
+                        title="Cambio de Clave (Soporte Técnico)">
+                        🔑
+                    </button>
+                </div>
+            </div>
+
+            <div
+                style="margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--border-color); text-align: center; color: var(--text-secondary); font-size: 13px;">
+                <p style="margin-bottom: 5px;">&copy; 2025 Asistente de Facturación DTE. Todos los derechos reservados.
+                </p>
+                <p style="margin-top: 0; opacity: 0.6;">Desarrollado para facilitar tu facturación electrónica.</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="exceljs.min.js"></script>
+
+    <script type="module" src="options.js"></script>
+</body>
+
+</html>

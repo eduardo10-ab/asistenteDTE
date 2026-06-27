@@ -42,21 +42,21 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyB-sxiiXRqSrhlGq8k2B7PAUk_J2YWsrDQ',
-    appId: '1:30028285167:web:ae7e231de34f8a6c47871a',
-    messagingSenderId: '30028285167',
-    projectId: 'facturacion-app-sv',
-    authDomain: 'facturacion-app-sv.firebaseapp.com',
-    storageBucket: 'facturacion-app-sv.firebasestorage.app',
-    measurementId: 'G-GXVGMGQTW2',
+    apiKey: 'AIzaSyAT9aEjjB01rj3tPaRbUymBjgZZsPof-JY',
+    appId: '1:321407998184:web:1e63d399acc57aba91915d',
+    messagingSenderId: '321407998184',
+    projectId: 'asistente-de-facturacion-dte',
+    authDomain: 'asistente-de-facturacion-dte.firebaseapp.com',
+    storageBucket: 'asistente-de-facturacion-dte.firebasestorage.app',
+    measurementId: 'G-J15T0LHQK0',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyDVWYdjN4eznTD6Vi7gPD5H7qYza42q8TE',
-    appId: '1:30028285167:android:5401ba3d16b7b61347871a',
-    messagingSenderId: '30028285167',
-    projectId: 'facturacion-app-sv',
-    storageBucket: 'facturacion-app-sv.firebasestorage.app',
+    apiKey: 'AIzaSyDt1k4o1sFfgj2b0yUgWSlk5yEPiyUa1Io',
+    appId: '1:321407998184:android:23f7f4ded34d17c591915d',
+    messagingSenderId: '321407998184',
+    projectId: 'asistente-de-facturacion-dte',
+    storageBucket: 'asistente-de-facturacion-dte.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(

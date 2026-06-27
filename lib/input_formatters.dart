@@ -142,7 +142,7 @@ class NameInputFormatter extends TextInputFormatter {
     // - Espacios (\s)
     // - Signos de puntuación comunes: . , - _ & ( ) / " '
     final String filtered = newValue.text.replaceAll(
-      RegExp(r'[^a-zA-Z0-9\sáéíóúÁÉÍÓÚñÑ.,\-_&()/"' + "']"),
+      RegExp("[^a-zA-Z0-9\\sáéíóúÁÉÍÓÚñÑ.,\\-_&()/\"']"),
       '',
     );
 

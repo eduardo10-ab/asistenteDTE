@@ -24,29 +24,24 @@ import 'models.dart';
 import 'storage_service.dart';
 import 'js_injection.dart';
 import 'correo_screen.dart';
+import 'admin_panel_screen.dart';
+import 'historial_facturas_screen.dart';
 import 'theme_provider.dart'; // <--- IMPORTANTE: Tu archivo de tema
-
-// --- Colores Constantes (Modo Claro) ---
-const Color colorBlanco = Colors.white;
-const Color colorCelestePastel = Color(0xFF80D8FF);
-const Color colorAzulActivo = Color(0xFF40C4FF);
-const Color colorGrisClaro = Color(0xFFF5F5F5);
-const Color colorTextoPrincipal = Color(0xFF424242);
-const Color colorTextoSecundario = Color(0xFF9E9E9E);
-
-// --- Colores Constantes (Modo Oscuro) ---
-const Color colorFondoOscuro = Color(0xFF121212);
-const Color colorCardOscuro = Color(0xFF1E1E1E);
-const Color colorTextoOscuro = Color(0xFFE0E0E0);
+import 'core/ui/app_colors.dart';
+import 'services/excel_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
-  // Envolvemos la app en el ChangeNotifierProvider para manejar el estado del tema
+  // Envolvemos la app en MultiProvider para manejar múltiples estados
   runApp(
-    ChangeNotifierProvider(
-      create: (_) => ThemeProvider(),
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
+        ChangeNotifierProvider(create: (_) => StorageService()),
+        Provider(create: (_) => ExcelService()),
+      ],
       child: const MyApp(),
     ),
   );
@@ -363,9 +358,8 @@ class _MainScreenState extends State<MainScreen> {
 
   WebViewController? _webViewController;
   late List<Widget> _widgetOptions;
-  final StorageService _storage = StorageService();
+  late final StorageService _storage;
   ActivationStatus _activationStatus = ActivationStatus.none;
-  bool _isLoadingStatus = true;
 
   final GlobalKey<_HomeScreenState> _homeScreenKey =
       GlobalKey<_HomeScreenState>();
@@ -377,22 +371,34 @@ class _MainScreenState extends State<MainScreen> {
   @override
   void initState() {
     super.initState();
+    _storage = Provider.of<StorageService>(context, listen: false);
+    _buildScreens();
     _loadInitialStatusAndBuildScreens();
   }
 
   Future<void> _loadInitialStatusAndBuildScreens() async {
-    final status = await _storage.getActivationStatus();
-    if (!mounted) return;
-    setState(() {
-      _activationStatus = status;
-      _isLoadingStatus = false;
-      _buildScreens();
-    });
+    try {
+      final status = await _storage.getActivationStatus();
+      if (!mounted) return;
+      setState(() {
+        _activationStatus = status;
+        _buildScreens();
+      });
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error cargando estado inicial: $e');
+      }
+      if (!mounted) return;
+      setState(() {
+        _activationStatus = ActivationStatus.none;
+        _buildScreens();
+      });
+    }
   }
 
   void _buildScreens() {
     _widgetOptions = <Widget>[
-      HomeScreen(
+      HomeScreen(                                          // index 0 - Inicio
         key: _homeScreenKey,
         initialStatus: _activationStatus,
         onWebViewRequested: (controller) {
@@ -404,12 +410,14 @@ class _MainScreenState extends State<MainScreen> {
         },
         onStatusChangeNeeded: _reloadActivationStatus,
       ),
-      CorreoScreen(key: _correoScreenKey, currentStatus: _activationStatus),
-      ClientesPerfilesScreen(currentStatus: _activationStatus),
-      ProductosScreen(
+      CorreoScreen(key: _correoScreenKey, currentStatus: _activationStatus), // index 1 - Correo
+      ClientesPerfilesScreen(currentStatus: _activationStatus),              // index 2 - Clientes
+      ProductosScreen(                                     // index 3 - Productos
         key: _productosScreenKey,
         currentStatus: _activationStatus,
       ),
+      const HistorialFacturasScreen(),                     // index 4 - Facturas
+      const AdminPanelScreen(),
     ];
   }
 
@@ -440,6 +448,7 @@ class _MainScreenState extends State<MainScreen> {
     if (index == 1 && _selectedIndex != 1) {
       _correoScreenKey.currentState?.loadData();
     }
+    // Productos ahora en índice 3
     if (index == 3 && _selectedIndex != 3) {
       _productosScreenKey.currentState?.loadData(_activationStatus);
     }
@@ -494,9 +503,6 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoadingStatus) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (bool didPop, dynamic result) async {
@@ -530,6 +536,10 @@ class _MainScreenState extends State<MainScreen> {
               icon: Icon(Icons.add_shopping_cart),
               label: 'Productos',
             ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.receipt),
+              label: 'Facturas',
+            ),
           ],
         ),
       ),
@@ -557,13 +567,16 @@ class _HomeScreenState extends State<HomeScreen> {
   final TextEditingController _activationKeyController =
       TextEditingController();
   bool _isActivating = false;
-  final StorageService _storage = StorageService();
+  late final StorageService _storage;
 
   WebViewController? _controller;
   bool _showWebView = false;
   bool _estaCargando = true;
   double _downloadProgress = 0.0;
   bool _isDownloading = false;
+
+  // Cache del Future para evitar relanzarlo en cada rebuild
+  Future<Perfil?>? _perfilFuture;
 
   DateTime? _lastPdfDownloadTime;
   final Duration _pdfCooldown = const Duration(seconds: 5);
@@ -627,7 +640,21 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _activationStatus = widget.initialStatus;
+    _storage = Provider.of<StorageService>(context, listen: false);
+    _perfilFuture = _storage.getCurrentProfileData();
+    _storage.addListener(_onStorageUpdated);
     _maybeRequestStoragePermission();
+  }
+
+  void _onStorageUpdated() {
+    // addPostFrameCallback evita el assertion 'debugFrameWasSentToEngine'
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        setState(() {
+          _perfilFuture = _storage.getCurrentProfileData();
+        });
+      }
+    });
   }
 
   Future<void> _maybeRequestStoragePermission() async {
@@ -647,6 +674,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+    _storage.removeListener(_onStorageUpdated);
     _activationKeyController.dispose();
     super.dispose();
   }
@@ -1430,34 +1458,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildGreetingUI(
-    BuildContext context,
-    ThemeData theme,
-    bool overlayEnabled,
-  ) {
-    return ListView(
-      padding: const EdgeInsets.all(16.0),
-      children: [
-        const SizedBox(height: 16.0),
-        _buildGreeting(),
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 24.0),
-          child: Divider(color: Colors.grey[300], height: 1),
-        ),
-        if (_activationStatus != ActivationStatus.pro) ...[
-          _buildActivationSection(),
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 24.0),
-            child: Divider(color: Colors.grey[300], height: 1),
-          ),
-        ],
-        _buildOverlaySection(context, overlayEnabled ? _toggleWebView : null),
-        const SizedBox(height: 24),
-        if (_activationStatus != ActivationStatus.pro) _buildProSection(),
-      ],
-    );
-  }
-
   Widget _buildWebViewUI() {
     if (_controller == null) {
       return const Center(child: CircularProgressIndicator());
@@ -1501,7 +1501,6 @@ class _HomeScreenState extends State<HomeScreen> {
       case ActivationStatus.demo:
         return Colors.orange.shade50;
       case ActivationStatus.none:
-      default:
         return Colors.grey.shade200;
     }
   }
@@ -1513,7 +1512,6 @@ class _HomeScreenState extends State<HomeScreen> {
       case ActivationStatus.demo:
         return Colors.orange.shade800;
       case ActivationStatus.none:
-      default:
         return Colors.grey.shade700;
     }
   }
@@ -1522,6 +1520,214 @@ class _HomeScreenState extends State<HomeScreen> {
     return const Text(
       'Bienvenido a tu asistente de facturación DTE',
       style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+    );
+  }
+
+  double _getTotalAcumulado(Perfil? perfil) {
+    final ventas = perfil?.ventas ?? const [];
+    return ventas.fold<double>(0, (sum, venta) {
+      final raw = (venta.total ?? '0').replaceAll(RegExp(r'[^0-9.,-]'), '');
+      final normalized = raw.replaceAll(',', '');
+      return sum + (double.tryParse(normalized) ?? 0);
+    });
+  }
+
+  void _showDashboardDetails(BuildContext context, Perfil? perfil) {
+    final clientes = perfil?.clients.length ?? 0;
+    final facturas = perfil?.ventas.length ?? 0;
+    final total = _getTotalAcumulado(perfil);
+    final promedio = facturas > 0 ? total / facturas : 0.0;
+
+    showModalBottomSheet(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) {
+        final sheetTheme = Theme.of(sheetContext);
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 28),
+            child: FutureBuilder<List<Producto>>(
+              future: _storage.getProductos(),
+              builder: (ctx, snap) {
+                final productos = snap.data?.length ?? 0;
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Resumen del perfil activo',
+                        style: sheetTheme.textTheme.titleLarge),
+                    const SizedBox(height: 6),
+                    Text(
+                      perfil != null ? 'Datos en tiempo real' : 'Sin perfil cargado',
+                      style: sheetTheme.textTheme.bodyMedium,
+                    ),
+                    const SizedBox(height: 20),
+                    _detailStatRow(sheetTheme, Icons.group_outlined, Colors.teal,
+                        'Clientes registrados', clientes.toString()),
+                    const Divider(height: 24),
+                    _detailStatRow(sheetTheme, Icons.receipt_long_outlined,
+                        Colors.indigo, 'Facturas emitidas', facturas.toString()),
+                    const Divider(height: 24),
+                    _detailStatRow(sheetTheme, Icons.payments_outlined, Colors.green,
+                        'Total acumulado', '\$${total.toStringAsFixed(2)}'),
+                    const Divider(height: 24),
+                    _detailStatRow(sheetTheme, Icons.calculate_outlined,
+                        Colors.orange, 'Promedio por factura',
+                        '\$${promedio.toStringAsFixed(2)}'),
+                    const Divider(height: 24),
+                    _detailStatRow(sheetTheme, Icons.inventory_2_outlined,
+                        Colors.deepPurple, 'Productos registrados',
+                        productos.toString()),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Toca una sección para ver más detalles en su pantalla.',
+                      style: sheetTheme.textTheme.bodyMedium,
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _detailStatRow(ThemeData theme, IconData icon, Color color,
+      String label, String value) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.10),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, color: color, size: 22),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Text(label,
+              style: theme.textTheme.bodyLarge
+                  ?.copyWith(fontWeight: FontWeight.w500)),
+        ),
+        Text(
+          value,
+          style: theme.textTheme.bodyLarge?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDashboardCard(BuildContext context, Perfil? perfil) {
+    final clientes = perfil?.clients.length ?? 0;
+    final facturas = perfil?.ventas.length ?? 0;
+    final total = _getTotalAcumulado(perfil);
+    final theme = Theme.of(context);
+
+    Widget metric(String title, String value, IconData icon, Color color) {
+      return Expanded(
+        child: Container(
+          margin: const EdgeInsets.only(right: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.10),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon, color: color, size: 20),
+              const SizedBox(height: 8),
+              Text(
+                value,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: color,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                title,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                  fontSize: 11,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return InkWell(
+      onTap: () => _showDashboardDetails(context, perfil),
+      borderRadius: BorderRadius.circular(16),
+      child: Card(
+        elevation: 0,
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Resumen de facturación',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  Icon(
+                    Icons.open_in_new_rounded,
+                    size: 16,
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Ver detalle',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              // Fila 1: Clientes y Facturas
+              Row(
+                children: [
+                  metric('Clientes', '$clientes', Icons.group_outlined, Colors.teal),
+                  metric('Facturas', '$facturas', Icons.receipt_long_outlined, Colors.indigo),
+                ],
+              ),
+              const SizedBox(height: 8),
+              // Fila 2: Total y Productos (productos via FutureBuilder anidado)
+              Row(
+                children: [
+                  metric('\$Total', '\$${total.toStringAsFixed(2)}', Icons.payments_outlined, Colors.green),
+                  FutureBuilder<List<Producto>>(
+                    future: _storage.getProductos(),
+                    builder: (ctx, snap) {
+                      final count = snap.data?.length ?? 0;
+                      return metric('Productos', '$count', Icons.inventory_2_outlined, Colors.deepPurple);
+                    },
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -1634,7 +1840,6 @@ class _HomeScreenState extends State<HomeScreen> {
                       );
                     },
                   ),
-                  Divider(height: 1, color: Colors.grey[300]),
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 14.0),
                     child: Text(
@@ -1662,6 +1867,38 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
       ],
+    );
+  }
+
+  Widget _buildGreetingUI(
+    BuildContext context,
+    ThemeData theme,
+    bool overlayEnabled,
+  ) {
+    return FutureBuilder<Perfil?>(
+      future: _perfilFuture,
+      builder: (context, snapshot) {
+        final perfil = snapshot.data;
+        return ListView(
+          padding: const EdgeInsets.all(16.0),
+          children: [
+            const SizedBox(height: 16.0),
+            _buildGreeting(),
+            const SizedBox(height: 16),
+            _buildOverlaySection(
+              context,
+              overlayEnabled ? _toggleWebView : null,
+            ),
+            const SizedBox(height: 16),
+            _buildDashboardCard(context, perfil),
+            if (_activationStatus != ActivationStatus.pro) ...[
+              _buildActivationSection(),
+            ],
+            const SizedBox(height: 8),
+            if (_activationStatus != ActivationStatus.pro) _buildProSection(),
+          ],
+        );
+      },
     );
   }
 

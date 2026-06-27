@@ -2,10 +2,10 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:provider/provider.dart'; // <--- IMPORTANTE
-import 'models.dart';
-import 'storage_service.dart';
-import 'main.dart'; // Para colores del tema si se necesitan
+import 'package:open_filex/open_filex.dart';
 import 'theme_provider.dart'; // <--- IMPORTANTE
+import 'storage_service.dart';
+import 'services/excel_service.dart';
 
 class ConfiguracionScreen extends StatefulWidget {
   const ConfiguracionScreen({super.key});
@@ -15,26 +15,9 @@ class ConfiguracionScreen extends StatefulWidget {
 }
 
 class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
-  final StorageService _storage = StorageService();
-  ActivationStatus _activationStatus = ActivationStatus.none;
-  bool _isLoading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadActivationStatus();
-  }
-
-  Future<void> _loadActivationStatus() async {
-    if (!mounted) return;
-    setState(() => _isLoading = true);
-    final status = await _storage.getActivationStatus();
-    if (!mounted) return;
-    setState(() {
-      _activationStatus = status;
-      _isLoading = false;
-    });
-  }
+  late final StorageService _storageService;
+  late final ExcelService _excelService;
+  bool _generandoExcel = false;
 
   Future<void> _abrirPoliticas() async {
     final Uri url = Uri.parse(
@@ -51,6 +34,36 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
     }
   }
 
+  Future<void> _generarReporteExcel() async {
+    if (_generandoExcel) return;
+
+    setState(() => _generandoExcel = true);
+    try {
+      final perfil = await _storageService.getCurrentProfileData();
+      final nombrePerfil = await _storageService.getCurrentProfileName();
+      final file = await _excelService.generarReporteVentasExcel(
+        nombrePerfil: nombrePerfil,
+        ventas: perfil.ventas,
+      );
+
+      await OpenFilex.open(file.path);
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Reporte generado: ${file.path}')));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error al generar reporte: $e')));
+    } finally {
+      if (mounted) {
+        setState(() => _generandoExcel = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -59,195 +72,230 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
     // Obtenemos el provider para saber qué tema está seleccionado
     final themeProvider = Provider.of<ThemeProvider>(context);
 
+    // Obtener servicios desde providers
+    _storageService = Provider.of<StorageService>(context, listen: false);
+    _excelService = Provider.of<ExcelService>(context, listen: false);
+
     return Scaffold(
-      backgroundColor: colorScheme.background,
+      backgroundColor: colorScheme.surface,
       appBar: AppBar(title: const Text('Configuración')),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : Column(
+      body: Column(
+        children: [
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.all(16.0),
               children: [
-                Expanded(
-                  child: ListView(
-                    padding: const EdgeInsets.all(16.0),
-                    children: [
-                      // --- NUEVA SECCIÓN: VISUALIZACIÓN ---
-                      Card(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 10),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Padding(
-                                padding: const EdgeInsets.only(
-                                  left: 20,
-                                  top: 10,
-                                  bottom: 5,
-                                ),
-                                child: Text(
-                                  'Visualización',
-                                  style: theme.textTheme.titleMedium,
-                                ),
-                              ),
-                              // Opción: Usar tema del dispositivo
-                              RadioListTile<ThemeMode>(
-                                title: const Text('Usar tema del dispositivo'),
+                // --- NUEVA SECCIÓN: VISUALIZACIÓN ---
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.only(
+                            left: 20,
+                            top: 10,
+                            bottom: 5,
+                          ),
+                          child: Text(
+                            'Visualización',
+                            style: theme.textTheme.titleMedium,
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
+                          ),
+                          child: SegmentedButton<ThemeMode>(
+                            segments: const [
+                              ButtonSegment<ThemeMode>(
                                 value: ThemeMode.system,
-                                groupValue: themeProvider.themeMode,
-                                onChanged: (value) {
-                                  if (value != null)
-                                    themeProvider.setThemeMode(value);
-                                },
+                                label: Text('Sistema'),
+                                icon: Icon(Icons.phone_android),
                               ),
-                              // Opción: Modo claro
-                              RadioListTile<ThemeMode>(
-                                title: const Text('Modo claro'),
+                              ButtonSegment<ThemeMode>(
                                 value: ThemeMode.light,
-                                groupValue: themeProvider.themeMode,
-                                onChanged: (value) {
-                                  if (value != null)
-                                    themeProvider.setThemeMode(value);
-                                },
+                                label: Text('Claro'),
+                                icon: Icon(Icons.light_mode),
                               ),
-                              // Opción: Modo oscuro
-                              RadioListTile<ThemeMode>(
-                                title: const Text('Modo oscuro'),
+                              ButtonSegment<ThemeMode>(
                                 value: ThemeMode.dark,
-                                groupValue: themeProvider.themeMode,
-                                onChanged: (value) {
-                                  if (value != null)
-                                    themeProvider.setThemeMode(value);
-                                },
+                                label: Text('Oscuro'),
+                                icon: Icon(Icons.dark_mode),
                               ),
                             ],
+                            selected: {themeProvider.themeMode},
+                            onSelectionChanged: (selection) {
+                              themeProvider.setThemeMode(selection.first);
+                            },
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 16),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
 
-                      // --- Card 2: Activación ---
-                      const SizedBox(height: 16),
-                      Card(
-                        child: Padding(
-                          padding: const EdgeInsets.all(20),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Activación',
-                                style: theme.textTheme.titleMedium,
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                'Para la activación de todas las funcionalidades por favor contactarse al: ',
-                                style: theme.textTheme.bodyLarge?.copyWith(
-                                  color: theme.disabledColor,
-                                ),
-                              ),
-                              Text(
-                                '7727-8551',
-                                style: theme.textTheme.bodyLarge?.copyWith(
-                                  color: theme.disabledColor,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
+                // --- Card 2: Activación ---
+                const SizedBox(height: 16),
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Activación', style: theme.textTheme.titleMedium),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Para la activación de todas las funcionalidades por favor contactarse al: ',
+                          style: theme.textTheme.bodyLarge?.copyWith(
+                            color: theme.disabledColor,
                           ),
                         ),
-                      ),
-
-                      const SizedBox(height: 16),
-                      Card(
-                        child: Padding(
-                          padding: const EdgeInsets.all(20),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Políticas de privacidad',
-                                style: theme.textTheme.titleMedium,
-                              ),
-                              const SizedBox(height: 16),
-                              SizedBox(
-                                width: double.infinity,
-                                child: FilledButton(
-                                  onPressed: _abrirPoliticas,
-                                  style: FilledButton.styleFrom(
-                                    backgroundColor: Colors.cyan,
-                                    foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 12,
-                                    ),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(8.0),
-                                    ),
-                                  ),
-                                  child: const Text(
-                                    'Ver políticas de privacidad',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
+                        Text(
+                          '7727-8551',
+                          style: theme.textTheme.bodyLarge?.copyWith(
+                            color: theme.disabledColor,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
-                      ),
-
-                      // --- Card 3: Soporte Técnico ---
-                      const SizedBox(height: 16),
-                      Card(
-                        child: Padding(
-                          padding: const EdgeInsets.all(20),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Soporte técnico',
-                                style: theme.textTheme.titleMedium,
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                'Reporte de errores de la aplicación por favor contactarnos:',
-                                style: theme.textTheme.bodyLarge?.copyWith(
-                                  color: theme.disabledColor,
-                                ),
-                              ),
-                              Text(
-                                'fuentesjoel723@gmail.com',
-                                style: theme.textTheme.bodyLarge?.copyWith(
-                                  color: theme.disabledColor,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              Text(
-                                'david.galvito2000@gmail.com',
-                                style: theme.textTheme.bodyLarge?.copyWith(
-                                  color: theme.disabledColor,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-
-                      // --- Card 4: Políticas de Privacidad ---
-                    ],
+                      ],
+                    ),
                   ),
                 ),
 
-                // --- Footer ---
-                Padding(
-                  padding: const EdgeInsets.all(20.0),
-                  child: Text(
-                    'Desarrollo por Joel Fuentes y David Gálvez',
-                    style: theme.textTheme.bodyMedium,
-                    textAlign: TextAlign.center,
+                const SizedBox(height: 16),
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Políticas de privacidad',
+                          style: theme.textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: 16),
+                        SizedBox(
+                          width: double.infinity,
+                          child: FilledButton(
+                            onPressed: _abrirPoliticas,
+                            style: FilledButton.styleFrom(
+                              backgroundColor: Colors.cyan,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8.0),
+                              ),
+                            ),
+                            child: const Text(
+                              'Ver políticas de privacidad',
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
+
+                const SizedBox(height: 16),
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Reportes', style: theme.textTheme.titleMedium),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Genera un archivo Excel con el historial de facturación del perfil actual.',
+                          style: theme.textTheme.bodyMedium,
+                        ),
+                        const SizedBox(height: 16),
+                        SizedBox(
+                          width: double.infinity,
+                          child: FilledButton.icon(
+                            onPressed: _generandoExcel
+                                ? null
+                                : _generarReporteExcel,
+                            icon: _generandoExcel
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Icon(Icons.grid_on),
+                            label: Text(
+                              _generandoExcel
+                                  ? 'Generando reporte...'
+                                  : 'Reporte de Ventas',
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                // --- Card 3: Soporte Técnico ---
+                const SizedBox(height: 16),
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Soporte técnico',
+                          style: theme.textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Reporte de errores de la aplicación por favor contactarnos:',
+                          style: theme.textTheme.bodyLarge?.copyWith(
+                            color: theme.disabledColor,
+                          ),
+                        ),
+                        Text(
+                          'fuentesjoel723@gmail.com',
+                          style: theme.textTheme.bodyLarge?.copyWith(
+                            color: theme.disabledColor,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          'david.galvito2000@gmail.com',
+                          style: theme.textTheme.bodyLarge?.copyWith(
+                            color: theme.disabledColor,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                // --- Card 4: Políticas de Privacidad ---
               ],
             ),
+          ),
+
+          // --- Footer ---
+          Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Text(
+              'Desarrollo por Joel Fuentes y David Gálvez',
+              style: theme.textTheme.bodyMedium,
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

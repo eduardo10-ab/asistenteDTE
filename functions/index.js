@@ -23,7 +23,7 @@ exports.validateLicense = onCall({ cors: true }, async (request) => {
     }
 
     // --- LÓGICA PRINCIPAL ---
-    const licensesRef = admin.firestore().collection('licenses');
+    const licensesRef = admin.firestore().collection('licencias');
 
     try {
         const snapshot = await licensesRef.where('key', '==', userKey).limit(1).get();

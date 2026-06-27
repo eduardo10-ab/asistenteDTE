@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Gestor</title>
+    <style>
+        :root {
+            --background-dark: #1A1B26;
+            --surface-dark: #2A2C3A; 
+            --primary-accent: #3E68D9;
+            --primary-hover: #507BEF; 
+            --text-primary: #F0F0F0; 
+            --text-secondary: #A0A0B0;
+            --border-color: #404258; 
+            --action-green: #28a745; 
+            --action-teal: #17a2b8;
+        }
+        body {
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, "Helvetica Neue", Arial, sans-serif;
+            width: 300px; padding: 15px; background-color: var(--background-dark); color: var(--text-primary);
+            border-radius: 8px; 
+            overflow: visible; /* Permitir que el menú se salga si es necesario */
+        }
+        .section {
+            background-color: var(--surface-dark);
+            padding: 15px; 
+            border: 1px solid var(--border-color);
+            border-radius: 8px; 
+            margin-bottom: 15px; 
+            text-align: left;
+        }
+        h3 {
+            margin-top: 0;
+            margin-bottom: 15px; 
+            font-size: 16px; 
+            font-weight: 600; 
+            color: var(--text-primary);
+            border-bottom: 1px solid var(--border-color); 
+            padding-bottom: 10px;
+        }
+        label { 
+            display: block;
+            margin-bottom: 8px; 
+            font-weight: 500; 
+            font-size: 13px; 
+            color: var(--text-secondary);
+        }
+        select, input[type="number"], input[type="text"] {
+            width: 100%;
+            padding: 9px; 
+            border: 1px solid var(--border-color);
+            border-radius: 4px; 
+            background-color: #353746; 
+            color: var(--text-primary); 
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+        select { margin-bottom: 15px; }
+        select:focus, input:focus { outline: none; border-color: var(--primary-accent); }
+        
+        /* --- LAYOUT FILA --- */
+        .input-row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 15px;
+            align-items: flex-start;
+            position: relative;
+        }
+        #productQuantity {
+            width: 60px !important;
+            text-align: center;
+            flex-shrink: 0;
+        }
+
+        /* --- BUSCADOR PERSONALIZADO --- */
+        .searchable-select {
+            position: relative;
+            flex-grow: 1;
+            /* width: 0; Truco para que flexbox maneje el ancho correctamente */
+            min-width: 0; 
+        }
+        #productInput {
+            cursor: pointer;
+            background-image: url('data:image/svg+xml;utf8,<svg fill="%23A0A0B0" height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/></svg>');
+            background-repeat: no-repeat;
+            background-position: right 8px center;
+            padding-right: 25px;
+            text-overflow: ellipsis; /* Puntos suspensivos en el input */
+        }
+
+        /* Lista Desplegable */
+        .dropdown-content {
+            display: none; 
+            position: absolute;
+            top: 100%;
+            left: 0;
+            width: 100%; /* El mismo ancho que el input */
+            max-height: 250px;
+            overflow-y: auto;
+            background-color: #252733;
+            border: 1px solid var(--primary-accent);
+            border-top: none;
+            z-index: 9999;
+            border-radius: 0 0 6px 6px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.6);
+            margin-top: 2px;
+        }
+        .dropdown-content.show { display: block; }
+        
+        /* --- ESTILO UNA SOLA LÍNEA --- */
+        .dropdown-item {
+            padding: 10px;
+            cursor: pointer;
+            border-bottom: 1px solid #3a3d4d;
+            font-size: 13px;
+            color: #eee;
+            
+            /* Flexbox para alinear Código - Nombre - Stock */
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            gap: 8px;
+            white-space: nowrap; /* Fuerza una sola línea */
+            overflow: hidden;
+        }
+        .dropdown-item:last-child { border-bottom: none; }
+        .dropdown-item:hover { background-color: var(--primary-accent); color: white; }
+        
+        .code-tag {
+            color: #8ab4f8;
+            font-family: monospace;
+            font-weight: bold;
+            font-size: 11px;
+            flex-shrink: 0; /* El código no se encoge */
+        }
+        
+        .name-text {
+            flex-grow: 1; /* Ocupa el espacio disponible */
+            overflow: hidden;
+            text-overflow: ellipsis; /* Puntos suspensivos si es largo */
+            min-width: 0; /* Necesario para que funcione el ellipsis en flexbox */
+        }
+
+        .stock-tag {
+            font-size: 11px;
+            color: #A0A0B0;
+            font-weight: bold;
+            flex-shrink: 0; /* El stock no se encoge */
+            margin-left: auto;
+        }
+        .dropdown-item:hover .stock-tag { color: #fff; }
+
+        button {
+            width: 100%; padding: 10px; font-size: 15px; font-weight: 600; cursor: pointer;
+            color: white; border: none; border-radius: 4px; transition: filter 0.2s;
+        }
+        button:hover { filter: brightness(1.1); }
+        button:disabled { background-color: #555 !important; cursor: not-allowed; filter: brightness(0.7); }
+        #fillClienteBtn { background-color: var(--action-green); }
+        #addProductoBtn { background-color: var(--action-teal); }
+        
+        .footer-actions { display: flex; justify-content: center; gap: 25px; margin-top: 20px; }
+        .footer-icon { font-size: 24px; color: var(--text-secondary); text-decoration: none; transition: all 0.2s; }
+        .footer-icon:hover { color: var(--primary-hover); transform: scale(1.15); }
+    </style>
+</head>
+<body>
+    <div class="section">
+        <label for="profileSelectorPopup">Perfil Activo:</label>
+        <select id="profileSelectorPopup"></select>
+    </div>
+    <div class="section">
+        <h3>Rellenar Cliente</h3>
+        <select id="clientSelector"><option>Cargando...</option></select>
+        <button id="fillClienteBtn">Aplicar Datos</button>
+    </div>
+
+    <div class="section">
+        <h3>Agregar &Iacute;tem</h3>
+        <div class="input-row">
+            <input type="number" id="productQuantity" value="1" min="1" placeholder="#" title="Cantidad">
+            <div class="searchable-select">
+                <input type="text" id="productInput" placeholder="🔍 Buscar..." autocomplete="off">
+                <div id="customDropdown" class="dropdown-content"></div>
+            </div>
+        </div>
+        <button id="addProductoBtn">Agregar a Factura</button>
+    </div>
+
+    <div class="footer-actions">
+        <a href="#" id="sendMailIcon" class="footer-icon" title="Enviar Factura por Correo">📧</a>
+        <a href="options.html" target="_blank" class="footer-icon" title="Ir a Configuración">⚙️</a>
+    </div>
+    <script src="popup.js" type="module"></script>
+</body>
+</html>

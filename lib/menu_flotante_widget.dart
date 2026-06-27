@@ -8,7 +8,8 @@ import 'dart:convert'; // Para jsonEncode
 import 'js_injection.dart';
 import 'models.dart';
 import 'storage_service.dart';
-import 'main.dart'; // Importa main.dart para colores del tema
+import 'package:provider/provider.dart';
+import 'core/ui/app_colors.dart';
 
 class MenuFlotanteWidget extends StatefulWidget {
   final WebViewController? webViewController;
@@ -19,7 +20,7 @@ class MenuFlotanteWidget extends StatefulWidget {
 }
 
 class _MenuFlotanteWidgetState extends State<MenuFlotanteWidget> {
-  final StorageService _storage = StorageService();
+  late final StorageService _storage;
 
   // Variables de estado
   List<Cliente> _clientes = [];
@@ -35,6 +36,7 @@ class _MenuFlotanteWidgetState extends State<MenuFlotanteWidget> {
   @override
   void initState() {
     super.initState();
+    _storage = Provider.of<StorageService>(context, listen: false);
     _loadDataFromStorage();
   }
 
@@ -102,7 +104,7 @@ class _MenuFlotanteWidgetState extends State<MenuFlotanteWidget> {
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
+                  color: Colors.black.withValues(alpha: 0.1),
                   blurRadius: 10,
                   offset: const Offset(0, 4),
                 ),

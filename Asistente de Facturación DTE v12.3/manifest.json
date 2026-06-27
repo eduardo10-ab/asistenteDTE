@@ -1,0 +1,73 @@
+{
+  "manifest_version": 3,
+  "name": "Asistente de Facturación DTE",
+  "version": "12.3",
+  "description": "Asistente de Facturación DTE para rellenar automáticamente formularios de Sistemas de Facturación Electrónica.",
+  "permissions": [
+    "storage",
+    "unlimitedStorage",
+    "downloads",
+    "scripting",
+    "activeTab",
+    "sidePanel",
+    "identity"
+  ],
+  "host_permissions": [
+    "https://admin.factura.gob.sv/*",
+    "https://*.mh.gob.sv/*",
+    "https://www.googleapis.com/*",
+    "https://gmail.googleapis.com/*",
+    "file:///*"
+  ],
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "Abrir Asistente",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://admin.factura.gob.sv/*",
+        "https://*.mh.gob.sv/*",
+        "file:///*"
+      ],
+      "js": [
+        "content_loader.js"
+      ],
+      "run_at": "document_start"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "injected.js"
+      ],
+      "matches": [
+        "https://admin.factura.gob.sv/*",
+        "https://*.mh.gob.sv/*",
+        "file:///*"
+      ]
+    }
+  ],
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "oauth2": {
+    "client_id": "520703530514-84rqp66v1so09g19hg61kk850mkaoklg.apps.googleusercontent.com",
+    "scopes": [
+      "https://www.googleapis.com/auth/gmail.readonly"
+    ]
+  }
+}

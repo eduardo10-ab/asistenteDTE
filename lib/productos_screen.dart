@@ -6,7 +6,8 @@ import 'package:flutter/services.dart';
 import 'models.dart';
 import 'storage_service.dart';
 import 'app_data.dart'; // Para kUnidadesMedida
-import 'main.dart'; // Para colores del tema general
+import 'core/ui/app_colors.dart';
+import 'package:provider/provider.dart';
 
 // --- COLORES ESPECÍFICOS ---
 const Color dangerColor = Color(0xFFD9534F);
@@ -22,7 +23,7 @@ class ProductosScreen extends StatefulWidget {
 }
 
 class ProductosScreenState extends State<ProductosScreen> {
-  final StorageService _storage = StorageService();
+  late final StorageService _storage;
   List<Producto> _productos = [];
   bool _isLoading = true;
   Producto? _productoParaEditar;
@@ -31,6 +32,8 @@ class ProductosScreenState extends State<ProductosScreen> {
   @override
   void initState() {
     super.initState();
+    _storage = context.read<StorageService>();
+    _storage.addListener(_onStorageChanged);
     loadData(widget.currentStatus);
   }
 
@@ -40,6 +43,17 @@ class ProductosScreenState extends State<ProductosScreen> {
     if (widget.currentStatus != oldWidget.currentStatus) {
       loadData(widget.currentStatus);
     }
+  }
+
+  @override
+  void dispose() {
+    _storage.removeListener(_onStorageChanged);
+    super.dispose();
+  }
+
+  void _onStorageChanged() {
+    if (!mounted) return;
+    loadData(widget.currentStatus);
   }
 
   Future<void> loadData(ActivationStatus status) async {
@@ -80,6 +94,7 @@ class ProductosScreenState extends State<ProductosScreen> {
   }
 
   void _onSaveProducto(Producto producto) async {
+    FocusManager.instance.primaryFocus?.unfocus();
     try {
       await _storage.saveProducto(producto);
       _showMessage(
@@ -140,131 +155,202 @@ class ProductosScreenState extends State<ProductosScreen> {
       appBar: AppBar(title: const Text('Gestionar Productos')),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : ListView(
-              padding: const EdgeInsets.all(16.0),
-              children: [
-                _buildProfileSection(theme),
-                const SizedBox(height: 24),
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(20.0),
-                    child: _ProductoForm(
-                      key: ValueKey(_productoParaEditar?.id ?? 'nuevo'),
-                      status: widget.currentStatus,
-                      productoInicial: _productoParaEditar,
-                      onSave: _onSaveProducto,
-                      onCancel: () {
-                        setState(() {
-                          _productoParaEditar = null;
-                        });
-                      },
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                Text('Ítems Guardados', style: theme.textTheme.titleMedium),
-                const SizedBox(height: 16),
-                if (widget.currentStatus == ActivationStatus.demo &&
-                    _productos.length >= kMaxDemoProducts)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 16.0),
-                    child: Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: Colors.orange[50],
-                        border: Border.all(color: Colors.orange),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        'Límite alcanzado ($kMaxDemoProducts productos). Actualiza a PRO para agregar más.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: Colors.orange[800],
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-                _productos.isEmpty
-                    ? Center(
+          : RefreshIndicator(
+              onRefresh: () => loadData(widget.currentStatus),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final wide = constraints.maxWidth >= 900;
+                  final profileAndForm = Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildProfileSection(theme),
+                      const SizedBox(height: 24),
+                      Card(
+                    
+                        elevation: 0,
                         child: Padding(
                           padding: const EdgeInsets.all(20.0),
-                          child: Text(
-                            'No hay productos guardados.',
-                            style: theme.textTheme.bodyMedium,
+                          child: ExpansionTile(
+                            key: ValueKey(_productoParaEditar?.id ?? 'nuevo'),
+                            initiallyExpanded: _productoParaEditar != null,
+                            maintainState: true,
+                            tilePadding: EdgeInsets.zero,
+                            childrenPadding: EdgeInsets.zero,
+                            shape: const RoundedRectangleBorder(
+                              side: BorderSide.none,
+                            ),
+                            collapsedShape: const RoundedRectangleBorder(
+                              side: BorderSide.none,
+                            ),
+                            iconColor: theme.colorScheme.onSurfaceVariant,
+                            collapsedIconColor:
+                                theme.colorScheme.onSurfaceVariant,
+                            title: Text(
+                              _productoParaEditar != null
+                                  ? 'Editar Ítem'
+                                  : 'Agregar Nuevo Ítem',
+                              style: theme.textTheme.titleMedium,
+                            ),
+                            children: [
+                              const SizedBox(height: 12),
+                              _ProductoForm(
+                                status: widget.currentStatus,
+                                productoInicial: _productoParaEditar,
+                                showTitle: false,
+                                onSave: _onSaveProducto,
+                                onCancel: () {
+                                  setState(() {
+                                    _productoParaEditar = null;
+                                  });
+                                },
+                              ),
+                            ],
                           ),
                         ),
-                      )
-                    : ListView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: _productos.length,
-                        itemBuilder: (context, index) {
-                          final producto = _productos[index];
-                          return InkWell(
-                            onTap: allowWriteActions
-                                ? () => setState(
-                                    () => _productoParaEditar = producto,
-                                  )
-                                : null,
-                            borderRadius: BorderRadius.circular(8),
-                            child: Container(
-                              margin: const EdgeInsets.only(bottom: 8),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 12,
+                      ),
+                    ],
+                  );
+
+                  final productsList = Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Ítems Guardados',
+                        style: theme.textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 16),
+                      if (widget.currentStatus == ActivationStatus.demo &&
+                          _productos.length >= kMaxDemoProducts)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 16.0),
+                          child: Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: Colors.orange[50],
+                              border: Border.all(color: Colors.orange),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              'Límite alcanzado ($kMaxDemoProducts productos). Actualiza a PRO para agregar más.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: Colors.orange[800],
+                                fontWeight: FontWeight.bold,
                               ),
-                              decoration: BoxDecoration(
-                                color: theme.cardTheme.color,
-                                borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                        ),
+                      _productos.isEmpty
+                          ? Center(
+                              child: Padding(
+                                padding: const EdgeInsets.all(20.0),
+                                child: Text(
+                                  'No hay productos guardados.',
+                                  style: theme.textTheme.bodyMedium,
+                                ),
                               ),
-                              child: Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
+                            )
+                          : ListView.builder(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              itemCount: _productos.length,
+                              itemBuilder: (context, index) {
+                                final producto = _productos[index];
+                                return InkWell(
+                                  onTap: allowWriteActions
+                                      ? () => setState(
+                                          () => _productoParaEditar = producto,
+                                        )
+                                      : null,
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Container(
+                                    margin: const EdgeInsets.only(bottom: 8),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 12,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: theme.cardTheme.color,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
                                       children: [
-                                        Text(
-                                          producto.descripcion,
-                                          style: theme.textTheme.bodyLarge
-                                              ?.copyWith(
-                                                fontWeight: FontWeight.w500,
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                producto.descripcion,
+                                                style: theme.textTheme.bodyLarge
+                                                    ?.copyWith(
+                                                      fontWeight:
+                                                          FontWeight.w500,
+                                                    ),
                                               ),
+                                              const SizedBox(height: 2),
+                                              Text(
+                                                'Unidad: ${kUnidadesMedida[producto.unidadMedida] ?? '??'} - Precio: \$${producto.precio}',
+                                                style:
+                                                    theme.textTheme.bodyMedium,
+                                              ),
+                                            ],
+                                          ),
                                         ),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          'Unidad: ${kUnidadesMedida[producto.unidadMedida] ?? '??'} - Precio: \$${producto.precio}',
-                                          style: theme.textTheme.bodyMedium,
+                                        IconButton(
+                                          icon: Icon(
+                                            Icons.delete_outline,
+                                            color: allowWriteActions
+                                                ? theme.colorScheme.onSurface
+                                                      .withValues(alpha: 0.6)
+                                                : Colors.grey.withAlpha(128),
+                                            size: 20,
+                                          ),
+                                          onPressed: allowWriteActions
+                                              ? () => _onDeleteProducto(
+                                                  producto.id,
+                                                )
+                                              : null,
+                                          tooltip: 'Eliminar',
+                                          padding: EdgeInsets.zero,
+                                          constraints: const BoxConstraints(),
                                         ),
                                       ],
                                     ),
                                   ),
-                                  IconButton(
-                                    icon: Icon(
-                                      Icons.delete_outline,
-                                      color: allowWriteActions
-                                          ? theme.colorScheme.onSurface
-                                                .withOpacity(0.6)
-                                          : Colors.grey.withAlpha(128),
-                                      size: 20,
-                                    ),
-                                    onPressed: allowWriteActions
-                                        ? () => _onDeleteProducto(producto.id)
-                                        : null,
-                                    tooltip: 'Eliminar',
-                                    padding: EdgeInsets.zero,
-                                    constraints: const BoxConstraints(),
-                                  ),
-                                ],
-                              ),
+                                );
+                              },
                             ),
-                          );
-                        },
-                      ),
-              ],
+                    ],
+                  );
+
+                  if (!wide) {
+                    return ListView(
+                      padding: const EdgeInsets.all(16.0),
+                      children: [
+                        profileAndForm,
+                        const SizedBox(height: 24),
+                        productsList,
+                      ],
+                    );
+                  }
+
+                  return SingleChildScrollView(
+                    padding: const EdgeInsets.all(16.0),
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(flex: 4, child: profileAndForm),
+                        const SizedBox(width: 16),
+                        Expanded(flex: 6, child: productsList),
+                      ],
+                    ),
+                  );
+                },
+              ),
             ),
     );
   }
@@ -315,12 +401,13 @@ class ProductosScreenState extends State<ProductosScreen> {
 class _ProductoForm extends StatefulWidget {
   final ActivationStatus status;
   final Producto? productoInicial;
+  final bool showTitle;
   final Function(Producto) onSave;
   final VoidCallback onCancel;
   const _ProductoForm({
-    super.key,
     required this.status,
     this.productoInicial,
+    this.showTitle = true,
     required this.onSave,
     required this.onCancel,
   });
@@ -353,7 +440,7 @@ class _ProductoFormState extends State<_ProductoForm> {
     _isEditing = widget.productoInicial != null;
     _producto = widget.productoInicial ?? Producto(id: '', unidadMedida: '59');
     _descripcionCtrl.text = _producto.descripcion;
-    _precioCtrl.text = _producto.precio;
+    _precioCtrl.text = _isEditing ? _producto.precio : '';
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         setState(() {});
@@ -370,6 +457,7 @@ class _ProductoFormState extends State<_ProductoForm> {
 
   void _guardar() {
     if (!mounted) return;
+    FocusManager.instance.primaryFocus?.unfocus();
     if (widget.status == ActivationStatus.none) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -417,11 +505,13 @@ class _ProductoFormState extends State<_ProductoForm> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            _isEditing ? 'Editar Ítem' : 'Agregar Nuevo Ítem',
-            style: theme.textTheme.titleMedium,
-          ),
-          const SizedBox(height: 20),
+          if (widget.showTitle) ...[
+            Text(
+              _isEditing ? 'Editar Ítem' : 'Agregar Nuevo Ítem',
+              style: theme.textTheme.titleMedium,
+            ),
+            const SizedBox(height: 20),
+          ],
           IgnorePointer(
             ignoring: !allowWriteActions,
             child: Opacity(
@@ -568,7 +658,7 @@ class _ProductoFormState extends State<_ProductoForm> {
         : null;
 
     return DropdownButtonFormField<T>(
-      value: currentValue,
+      initialValue: currentValue,
       items: items
           .map(
             (item) => DropdownMenuItem<T>(

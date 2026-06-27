@@ -23,11 +23,9 @@ class PDFViewerScreen extends StatelessWidget {
           IconButton(
             icon: const Icon(Icons.share),
             onPressed: () async {
-              // <<< FIX: `SharePlus.shareXFiles` no existe, se usa `Share.shareXFiles`
-              // El linter se confundía, pero esta es la forma correcta de usar el paquete.
-              await Share.shareXFiles([
-                XFile(filePath),
-              ], subject: 'Compartir PDF');
+              await SharePlus.instance.share(
+                ShareParams(files: [XFile(filePath)], subject: 'Compartir PDF'),
+              );
             },
           ),
           IconButton(
