@@ -6,8 +6,8 @@ import 'package:flutter/services.dart';
 import 'models.dart';
 import 'storage_service.dart';
 import 'app_data.dart'; // Para kUnidadesMedida
-import 'core/ui/app_colors.dart';
 import 'package:provider/provider.dart';
+import 'profile_avatar_menu.dart';
 
 // --- COLORES ESPECÍFICOS ---
 const Color dangerColor = Color(0xFFD9534F);
@@ -22,12 +22,16 @@ class ProductosScreen extends StatefulWidget {
   State<ProductosScreen> createState() => ProductosScreenState();
 }
 
-class ProductosScreenState extends State<ProductosScreen> {
+class ProductosScreenState extends State<ProductosScreen>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
   late final StorageService _storage;
   List<Producto> _productos = [];
   bool _isLoading = true;
   Producto? _productoParaEditar;
   String _currentProfileName = "";
+  List<String> _perfiles = [];
 
   @override
   void initState() {
@@ -61,11 +65,13 @@ class ProductosScreenState extends State<ProductosScreen> {
     setState(() => _isLoading = true);
     try {
       final profileName = await _storage.getCurrentProfileName();
+      final profileNames = await _storage.getProfileNames();
       final productos = await _storage.getProductos();
       if (!mounted) return;
       setState(() {
         _productos = productos;
         _currentProfileName = profileName;
+        _perfiles = profileNames;
         _isLoading = false;
         _productoParaEditar = null;
       });
@@ -95,6 +101,17 @@ class ProductosScreenState extends State<ProductosScreen> {
 
   void _onSaveProducto(Producto producto) async {
     FocusManager.instance.primaryFocus?.unfocus();
+
+    // Validar límite de productos en modo demo
+    if (widget.currentStatus == ActivationStatus.demo && producto.id.isEmpty) {
+      if (_productos.isNotEmpty) {
+        _showError(
+          'Modo Demo: Máximo 1 producto permitido. Actualiza a Pro para agregar más.',
+        );
+        return;
+      }
+    }
+
     try {
       await _storage.saveProducto(producto);
       _showMessage(
@@ -146,13 +163,41 @@ class ProductosScreenState extends State<ProductosScreen> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // required for AutomaticKeepAliveClientMixin
     final theme = Theme.of(context);
     final bool allowWriteActions =
         widget.currentStatus != ActivationStatus.none;
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: AppBar(title: const Text('Gestionar Productos')),
+      resizeToAvoidBottomInset: true,
+      appBar: AppBar(
+        title: const Text('Gestionar Productos'),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 8.0),
+            child: ProfileAvatarMenu(
+              perfilActivo: _currentProfileName,
+              perfiles: _perfiles,
+              activationStatus: widget.currentStatus,
+              onCambiarPerfil: (p) async {
+                if (p != null) {
+                  await _storage.switchProfile(p);
+                  loadData(widget.currentStatus);
+                }
+              },
+              onAfterConfiguracion: () => loadData(widget.currentStatus),
+              onCerrarSesion: () async {
+                await Provider.of<StorageService>(
+                  context,
+                  listen: false,
+                ).signOutUser();
+                loadData(widget.currentStatus);
+              },
+            ),
+          ),
+        ],
+      ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
@@ -163,10 +208,9 @@ class ProductosScreenState extends State<ProductosScreen> {
                   final profileAndForm = Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildProfileSection(theme),
+                      const SizedBox.shrink(),
                       const SizedBox(height: 24),
                       Card(
-                    
                         elevation: 0,
                         child: Padding(
                           padding: const EdgeInsets.all(20.0),
@@ -352,47 +396,6 @@ class ProductosScreenState extends State<ProductosScreen> {
                 },
               ),
             ),
-    );
-  }
-
-  Widget _buildProfileSection(ThemeData theme) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: colorCelestePastel.withAlpha(26),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: colorCelestePastel.withAlpha(77)),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.account_circle, color: colorAzulActivo, size: 28),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'PERFIL ACTIVO',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: colorAzulActivo,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 1.0,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  _currentProfileName,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
@@ -664,7 +667,10 @@ class _ProductoFormState extends State<_ProductoForm> {
             (item) => DropdownMenuItem<T>(
               value: item.value,
               child: DefaultTextStyle(
-                style: theme.textTheme.bodyLarge ?? const TextStyle(),
+                style: (theme.textTheme.bodyLarge ?? const TextStyle()).copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: theme.textTheme.bodyLarge?.color ?? Colors.black,
+                ),
                 child: item.child,
               ),
             ),
@@ -674,6 +680,7 @@ class _ProductoFormState extends State<_ProductoForm> {
       dropdownColor: theme.cardTheme.color,
       decoration: InputDecoration(labelText: label),
       isExpanded: true,
+      menuMaxHeight: 400,
     );
   }
 }

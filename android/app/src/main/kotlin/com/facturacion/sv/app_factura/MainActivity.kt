@@ -73,13 +73,9 @@ class MainActivity: FlutterActivity() {
                     outputStream.flush()
                 }
 
-                // Devolvemos el path del archivo, que es crucial para OpenFilex
-                val path = getRealPathFromUri(uri)
-                if (path != null) {
-                    result.success(path)
-                } else {
-                    result.success("") // Devolver cadena vacía si no se puede obtener la ruta real
-                }
+                // Devolvemos el path del archivo, o el URI de contenido si no es posible resolverlo.
+                val path = getRealPathFromUri(uri) ?: uri.toString()
+                result.success(path)
             } catch (e: Exception) {
                 if (uri != null) {
                     // Borrar el registro incompleto si falla la escritura

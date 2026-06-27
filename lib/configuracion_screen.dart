@@ -19,6 +19,27 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
   late final ExcelService _excelService;
   bool _generandoExcel = false;
 
+  @override
+  void initState() {
+    super.initState();
+    // CRÍTICO: inicializar en initState, NO en build()
+    // Si se inicializan en build(), el late final falla al reconstruir (ej. cambio de tema)
+    _storageService = Provider.of<StorageService>(context, listen: false);
+    _excelService = Provider.of<ExcelService>(context, listen: false);
+    _storageService.addListener(_onStorageChanged);
+  }
+
+  @override
+  void dispose() {
+    _storageService.removeListener(_onStorageChanged);
+    super.dispose();
+  }
+
+  void _onStorageChanged() {
+    if (!mounted) return;
+    setState(() {});
+  }
+
   Future<void> _abrirPoliticas() async {
     final Uri url = Uri.parse(
       'https://drive.google.com/file/d/1cf2wmjUVlTGlXAo1dQDbEc020FkU04gQ/view?usp=sharing',
@@ -71,10 +92,6 @@ class _ConfiguracionScreenState extends State<ConfiguracionScreen> {
 
     // Obtenemos el provider para saber qué tema está seleccionado
     final themeProvider = Provider.of<ThemeProvider>(context);
-
-    // Obtener servicios desde providers
-    _storageService = Provider.of<StorageService>(context, listen: false);
-    _excelService = Provider.of<ExcelService>(context, listen: false);
 
     return Scaffold(
       backgroundColor: colorScheme.surface,

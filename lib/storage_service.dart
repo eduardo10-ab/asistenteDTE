@@ -2,8 +2,10 @@
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import 'package:cloud_functions/cloud_functions.dart';
@@ -13,7 +15,7 @@ import 'services/firestore_service.dart';
 // --- LÍMITES DEMO ACTUALIZADOS ---
 const int kMaxDemoProfiles = 2; // Solo 1 perfil
 const int kMaxDemoClients = 5; // Hasta 5 clientes
-const int kMaxDemoProducts = 2; // Hasta 2 productos
+const int kMaxDemoProducts = 1; // Máximo 1 producto en modo demo
 
 class StorageService extends ChangeNotifier {
   static const String _activationStatusKey = 'activationStatus';
@@ -29,6 +31,10 @@ class StorageService extends ChangeNotifier {
   String? _currentLicenseKey; // Para caché de la licencia actual
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>?
   _userDataSubscription;
+  String? _activeRealtimeSyncLicenseKey;
+  bool _backgroundSyncInProgress = false;
+  DateTime? _lastBackgroundSyncAt;
+  static const Duration _minBackgroundSyncInterval = Duration(seconds: 20);
 
   StorageService() {
     _firestoreService = FirestoreService();
@@ -79,9 +85,6 @@ class StorageService extends ChangeNotifier {
     final deviceId = await _getOrCreateDeviceId();
     try {
       // <<< FIX: `print` reemplazado por `kDebugMode` >>>
-      if (kDebugMode) {
-        print("Intentando activar $key con deviceId: $deviceId");
-      }
 
       // Llamada a tu Cloud Function 'validateLicense'
       final HttpsCallable callable = FirebaseFunctions.instance.httpsCallable(
@@ -115,10 +118,6 @@ class StorageService extends ChangeNotifier {
         throw data['message'] ?? 'Error de activación desconocido.';
       }
     } on FirebaseFunctionsException catch (e) {
-      if (kDebugMode) {
-        print('Error de Cloud Function: ${e.code} - ${e.message}');
-      }
-
       // Si la callable no se encuentra en el proyecto, intentamos regiones comunes
       if (e.code == 'not-found') {
         // Regiones comunes donde podría haberse desplegado la función
@@ -130,7 +129,6 @@ class StorageService extends ChangeNotifier {
 
         for (final region in fallbackRegions) {
           try {
-            if (kDebugMode) print('Intentando callable en región: $region');
             final HttpsCallable callableRegion = FirebaseFunctions.instanceFor(
               region: region,
             ).httpsCallable('validateLicense');
@@ -155,19 +153,13 @@ class StorageService extends ChangeNotifier {
             } else {
               throw dataRegion['message'] ?? 'Error de activación desconocido.';
             }
-          } on FirebaseFunctionsException catch (e2) {
-            if (kDebugMode) {
-              print('Región $region -> ${e2.code} : ${e2.message}');
-            }
+          } on FirebaseFunctionsException catch (_) {
             // seguimos probando otras regiones
             continue;
           }
         }
 
         // Si ninguna región devolvió la función, informar al usuario con detalle
-        if (kDebugMode) {
-          print('Fallback a validación directa por Firestore (sin Functions).');
-        }
         return _activateViaFirestoreFallback(key, deviceId);
       }
 
@@ -176,14 +168,8 @@ class StorageService extends ChangeNotifier {
         throw 'Error de validación: ${e.message}';
       }
 
-      if (kDebugMode) {
-        print('Fallback por error callable: ${e.code}. Intentando Firestore.');
-      }
       return _activateViaFirestoreFallback(key, deviceId);
     } catch (e) {
-      if (kDebugMode) {
-        print('Error general de activación: $e');
-      }
       rethrow; // Reenviamos el error exacto (ej. "Clave ya usada")
     }
   }
@@ -250,11 +236,6 @@ class StorageService extends ChangeNotifier {
         }
       } catch (e) {
         // <<< FIX: `print` reemplazado por `kDebugMode` >>>
-        if (kDebugMode) {
-          print(
-            "Error decodificando perfiles: $e. Creando perfil predeterminado.",
-          );
-        }
         profilesMap = {'Perfil Predeterminado': Perfil.empty()};
         await _saveProfilesData(profilesMap);
         await switchProfile('Perfil Predeterminado');
@@ -271,7 +252,7 @@ class StorageService extends ChangeNotifier {
     encodableMap = _purgeSoftDeletedInRawProfiles(encodableMap);
     await prefs.setString(_profilesKey, jsonEncode(encodableMap));
 
-    // ✅ SINCRONIZAR CON FIRESTORE si el usuario es PRO
+    // SINCRONIZAR CON FIRESTORE si el usuario es PRO
     _syncToFirestore(encodableMap);
   }
 
@@ -290,7 +271,7 @@ class StorageService extends ChangeNotifier {
         inventoryEnabled: false,
       );
     } catch (e) {
-      if (kDebugMode) print('⚠️ Error sincronizando a Firestore: $e');
+      final _ = e;
     }
   }
 
@@ -303,7 +284,7 @@ class StorageService extends ChangeNotifier {
 
     final prefs = await SharedPreferences.getInstance();
     _currentLicenseKey = prefs.getString(_licenseKeyKey);
-    if (_currentLicenseKey != null) {
+    if (_currentLicenseKey != null && _userDataSubscription == null) {
       unawaited(startRealtimeSync());
     }
     return _currentLicenseKey;
@@ -319,35 +300,25 @@ class StorageService extends ChangeNotifier {
   Future<void> startRealtimeSync() async {
     final licenseKey = await getCurrentLicenseKey();
     if (licenseKey == null || licenseKey == LicenseKeys.demoKey) {
-      if (kDebugMode) {
-        print(
-          '⏭️ Realtime sync omitido: licenseKey=$licenseKey (DEMO no sincroniza)',
-        );
-      }
       return;
     }
 
-    if (kDebugMode) {
-      print('🔄 Iniciando listener en tiempo real para: $licenseKey');
+    if (_userDataSubscription != null &&
+        _activeRealtimeSyncLicenseKey == licenseKey) {
+      return;
     }
 
     await _userDataSubscription?.cancel();
+    _activeRealtimeSyncLicenseKey = licenseKey;
     _userDataSubscription = _firestoreService.listenToUserDataChanges(
       licenseKey,
       (data) async {
         if (data == null) {
-          if (kDebugMode) print('ℹ️ Firestore listener: data es null');
           return;
-        }
-        if (kDebugMode) {
-          print('🔔 Firestore cambio detectado, aplicando datos...');
         }
         await _applyFirestoreData(data);
       },
     );
-    if (kDebugMode) {
-      print('✅ Listener iniciado correctamente');
-    }
   }
 
   // --- CARGAR DATOS DESDE FIRESTORE ---
@@ -355,56 +326,20 @@ class StorageService extends ChangeNotifier {
     try {
       final cloudData = await _firestoreService.downloadUserData(licenseKey);
       if (cloudData == null) {
-        if (kDebugMode) print('ℹ️ No hay datos en Firestore para sincronizar');
         return;
       }
       await _applyFirestoreData(cloudData);
     } catch (e) {
-      if (kDebugMode) print('⚠️ Error cargando datos de Firestore: $e');
+      final _ = e;
     }
   }
 
   Future<void> _applyFirestoreData(Map<String, dynamic> cloudData) async {
     if (cloudData['profiles'] == null) {
-      if (kDebugMode) print('⚠️ FIRESTORE: No hay perfiles en cloudData');
       return;
     }
 
     final cloudProfiles = cloudData['profiles'] as Map<String, dynamic>;
-    if (kDebugMode) {
-      print(
-        '🌐 FIRESTORE: Recibidas ${cloudProfiles.length} perfiles del servidor',
-      );
-      for (final key in cloudProfiles.keys) {
-        final profile = cloudProfiles[key];
-        if (profile is Map) {
-          final ventasCount =
-              (profile['ventas'] as List<dynamic>?)?.length ?? 0;
-          print('  Perfil[$key]: $ventasCount ventas');
-          // Mostrar detalle de las primeras ventas para depuración
-          if (ventasCount > 0) {
-            final ventasList = profile['ventas'] as List<dynamic>;
-            for (int i = 0; i < ventasList.length && i < 5; i++) {
-              final v = ventasList[i];
-              if (v is Map) {
-                print('    Venta[$i] keys: ${v.keys.toList()}');
-                // print small sample of values
-                for (final k in v.keys) {
-                  final val = v[k];
-                  if (val == null) continue;
-                  final sval = val is String
-                      ? (val.length > 60 ? '${val.substring(0, 60)}...' : val)
-                      : val.toString();
-                  print('      $k: $sval');
-                }
-              } else {
-                print('    Venta[$i]: $v');
-              }
-            }
-          }
-        }
-      }
-    }
 
     final prefs = await SharedPreferences.getInstance();
     final mergedProfiles = _purgeSoftDeletedInRawProfiles(cloudProfiles);
@@ -420,10 +355,6 @@ class StorageService extends ChangeNotifier {
           profilesData.keys.first.toString(),
         );
       }
-    }
-
-    if (kDebugMode) {
-      print('✅ Datos descargados de Firestore y mergeados con datos locales');
     }
 
     notifyListeners();
@@ -471,33 +402,51 @@ class StorageService extends ChangeNotifier {
   }
 
   Future<Perfil> getCurrentProfileData() async {
-    final refreshedProfile = await getCurrentProfileDataFromFirestore();
-    if (refreshedProfile != null) {
-      if (kDebugMode) {
-        print(
-          '🌐 PROFILE REFRESHED FROM FIRESTORE: ${refreshedProfile.ventas.length} ventas, '
-          '${refreshedProfile.clients.length} clientes, ${refreshedProfile.products.length} productos',
-        );
-      }
-      return refreshedProfile;
+    final profile = await _getCurrentProfile();
+
+    // Luego, en background, sincronizamos con Firestore si es PRO
+    // No ejecutamos el sync demasiado seguido para evitar reinicios
+    // en cascada cuando la UI se actualiza varias veces.
+    if (_shouldRunBackgroundSync()) {
+      unawaited(_backgroundSyncFromFirestore());
     }
 
-    final profile = await _getCurrentProfile();
-    if (kDebugMode) {
-      print(
-        '📋 PROFILE LOADED: ${profile.ventas.length} ventas, '
-        '${profile.clients.length} clientes, ${profile.products.length} productos',
-      );
-      for (int i = 0; i < profile.ventas.length && i < 5; i++) {
-        final v = profile.ventas[i];
-        print(
-          '  Venta[$i]: id=${v.id}, cliente=${v.cliente}, fecha=${v.fecha}, hora=${v.hora}, '
-          'codigo=${v.codigo}, numeroControl=${v.numeroControl}, total=${v.total}, '
-          'tipo=${v.tipo}, estado=${v.estado}, timestamp=${v.timestamp}',
-        );
-      }
-    }
     return profile;
+  }
+
+  bool _shouldRunBackgroundSync() {
+    if (_backgroundSyncInProgress) {
+      return false;
+    }
+    if (_lastBackgroundSyncAt == null) {
+      return true;
+    }
+    return DateTime.now().difference(_lastBackgroundSyncAt!) >=
+        _minBackgroundSyncInterval;
+  }
+
+  /// Sincroniza desde Firestore en background sin bloquear la UI.
+  Future<void> _backgroundSyncFromFirestore() async {
+    if (_backgroundSyncInProgress) {
+      return;
+    }
+
+    _backgroundSyncInProgress = true;
+
+    try {
+      final licenseKey = await _getCurrentLicenseKeyFromPrefs();
+      if (licenseKey == null || licenseKey == LicenseKeys.demoKey) return;
+
+      final cloudData = await _firestoreService.downloadUserData(licenseKey);
+      if (cloudData == null) return;
+
+      await _applyFirestoreData(cloudData);
+    } catch (e) {
+      final _ = e;
+    } finally {
+      _backgroundSyncInProgress = false;
+      _lastBackgroundSyncAt = DateTime.now();
+    }
   }
 
   Future<Perfil?> getCurrentProfileDataFromFirestore() async {
@@ -654,6 +603,290 @@ class StorageService extends ChangeNotifier {
     }
   }
 
+  /// Encuentra el directorio de Descargas real del dispositivo Android,
+  /// probando todos los nombres posibles (Download, Downloads, Descargas…)
+  Future<Directory> _findRealDownloadsDir() async {
+    try {
+      final extDirs = await getExternalStorageDirectories(
+        type: StorageDirectory.downloads,
+      );
+      if (extDirs != null && extDirs.isNotEmpty) {
+        // La ruta típica es: /storage/emulated/0/Android/data/<pkg>/files/Downloads
+        // Subimos hasta la raíz del almacenamiento externo
+        final rootStorage = extDirs.first.path.split('/Android').first;
+        // Probar todos los nombres comunes
+        for (final name in [
+          'Download',
+          'Downloads',
+          'Descargas',
+          'descargas',
+          'DESCARGAS',
+        ]) {
+          final dir = Directory('$rootStorage/$name');
+          if (await dir.exists()) {
+            return dir;
+          }
+        }
+        // Ninguno existe: crear Download como fallback
+        final fallback = Directory('$rootStorage/Download');
+        await fallback.create(recursive: true);
+        return fallback;
+      }
+    } catch (e) {
+      // Error buscando Descargas
+    }
+    // Fallback final: directorio de documentos de la app
+    return getApplicationDocumentsDirectory();
+  }
+
+  /// Obtiene la carpeta destino para una factura con la estructura:
+  /// Descargas/asistente de facturacion DTE/facturas emitidas/[perfil]/[año]/[mes]/
+  /// JSON y PDF se guardan juntos en la misma carpeta.
+  Future<Directory> _getFacturaDestDir() async {
+    final baseDir = Platform.isAndroid
+        ? await _findRealDownloadsDir()
+        : await getApplicationDocumentsDirectory();
+
+    final profileName = await getCurrentProfileName();
+    final now = DateTime.now();
+    const meses = [
+      '',
+      'Enero',
+      'Febrero',
+      'Marzo',
+      'Abril',
+      'Mayo',
+      'Junio',
+      'Julio',
+      'Agosto',
+      'Septiembre',
+      'Octubre',
+      'Noviembre',
+      'Diciembre',
+    ];
+    final month = '${now.month.toString().padLeft(2, '0')} ${meses[now.month]}';
+    final safeProfile = profileName
+        .replaceAll(RegExp(r'[<>:"/\\|?*]'), '_')
+        .trim();
+
+    final destDir = Directory(
+      '${baseDir.path}'
+      '/Asistente de Facturacion DTE'
+      '/Facturas Emitidas'
+      '/$safeProfile'
+      '/${now.year}'
+      '/$month',
+    );
+    if (!await destDir.exists()) {
+      await destDir.create(recursive: true);
+    }
+    return destDir;
+  }
+
+  // Mantener getFacturasDirectory por compatibilidad con llamadas existentes
+  Future<Directory> getFacturasDirectory() async => _getFacturaDestDir();
+
+  /// Genera un nombre de archivo seguro con formato: CLIENTE_DD-MM-YYYY.extension
+  String _generateSafeFilename(
+    String nombreCliente,
+    DateTime fecha,
+    String extension,
+  ) {
+    // Limpiar nombre del cliente: solo letras, números y espacios -> guiones bajos
+    final safeName = nombreCliente
+        .replaceAll(RegExp(r'[^a-zA-Z0-9\s]'), '')
+        .replaceAll(RegExp(r'\s+'), '_')
+        .toUpperCase();
+
+    // Formato de fecha: DD-MM-YYYY
+    final dateStr =
+        '${fecha.day.toString().padLeft(2, '0')}-${fecha.month.toString().padLeft(2, '0')}-${fecha.year}';
+
+    return '${safeName}_$dateStr.$extension';
+  }
+
+  /// Guarda un JSON de factura en la carpeta del mes/año/perfil.
+  /// El JSON mantiene su nombre original sin modificaciones
+  Future<File> saveFacturaJson(String filename, String content) async {
+    final dir = await _getFacturaDestDir();
+    final file = File('${dir.path}/$filename');
+    await file.writeAsString(content, flush: true);
+    return file;
+  }
+
+  /// Guarda un PDF de factura en la misma carpeta que el JSON.
+  /// Si se proveen clientName y fecha, usa formato: CLIENTE_DD-MM-YYYY.pdf
+  Future<File> saveFacturaPdf(
+    String filename,
+    List<int> bytes, {
+    String? clientName,
+    DateTime? fecha,
+  }) async {
+    final dir = await _getFacturaDestDir();
+
+    // Si se provee nombre de cliente y fecha, generar nombre personalizado
+    String finalFilename = filename;
+    if (clientName != null && fecha != null) {
+      finalFilename = _generateSafeFilename(clientName, fecha, 'pdf');
+    }
+
+    final file = File('${dir.path}/$finalFilename');
+    await file.writeAsBytes(bytes, flush: true);
+    return file;
+  }
+
+  /// Busca los archivos más recientes (JSON y PDF) de un cliente en la carpeta de facturas
+  /// Busca recursivamente en todas las subcarpetas del perfil actual
+  Future<Map<String, File?>> findClientLatestFiles(String clientName) async {
+    try {
+      final baseDir = Platform.isAndroid
+          ? await _findRealDownloadsDir()
+          : await getApplicationDocumentsDirectory();
+
+      final profileName = await getCurrentProfileName();
+      final safeProfile = profileName
+          .replaceAll(RegExp(r'[<>:"/\\|?*]'), '_')
+          .trim();
+
+      final profileDir = Directory(
+        '${baseDir.path}'
+        '/Asistente de Facturacion DTE'
+        '/Facturas Emitidas'
+        '/$safeProfile',
+      );
+
+      if (!await profileDir.exists()) {
+        return {'json': null, 'pdf': null};
+      }
+
+      // Buscar recursivamente en todas las subcarpetas
+      final files = profileDir.listSync(recursive: true);
+
+      final safeName = clientName
+          .replaceAll(RegExp(r'[^a-zA-Z0-9\s]'), '')
+          .replaceAll(RegExp(r'\s+'), '_')
+          .toUpperCase();
+
+      File? latestJson;
+      File? latestPdf;
+      DateTime? latestJsonDate;
+      DateTime? latestPdfDate;
+
+      // Primera pasada: buscar el PDF del cliente
+      for (final item in files) {
+        if (item is File) {
+          final name = item.path.split('/').last.split('\\').last;
+          final stat = item.statSync();
+          final modified = stat.modified;
+
+          // Buscar PDFs que empiecen con el nombre del cliente
+          if (name.endsWith('.pdf') &&
+              name.toUpperCase().startsWith(safeName)) {
+            if (latestPdf == null || modified.isAfter(latestPdfDate!)) {
+              latestPdf = item;
+              latestPdfDate = modified;
+              if (kDebugMode) print('✅ PDF encontrado: ${item.path}');
+            }
+          }
+        }
+      }
+
+      // Segunda pasada: si encontramos PDF, buscar JSON en la misma carpeta
+      if (latestPdf != null) {
+        final pdfDir = latestPdf.parent.path;
+        if (kDebugMode) print('🔍 Buscando JSON en: $pdfDir');
+
+        for (final item in files) {
+          if (item is File && item.parent.path == pdfDir) {
+            final name = item.path.split('/').last.split('\\').last;
+
+            if (name.endsWith('.json')) {
+              final stat = item.statSync();
+              final modified = stat.modified;
+
+              if (latestJson == null || modified.isAfter(latestJsonDate!)) {
+                latestJson = item;
+                latestJsonDate = modified;
+              }
+            }
+          }
+        }
+      }
+
+      return {'json': latestJson, 'pdf': latestPdf};
+    } catch (e) {
+      return {'json': null, 'pdf': null};
+    }
+  }
+
+  /// Registra una venta generada desde el WebView en el perfil activo
+  /// y la sincroniza a Firestore para que aparezca en la webapp y en el historial.
+  Future<void> addVenta(Venta venta) async {
+    final profiles = await _loadProfilesData();
+    final profileName = await getCurrentProfileName();
+    final profile = profiles[profileName] ?? Perfil.empty();
+
+    // Evitar duplicados por código de generación o ID
+    final existingIndex = profile.ventas.indexWhere(
+      (v) =>
+          (venta.codigo != null &&
+              venta.codigo!.isNotEmpty &&
+              v.codigo == venta.codigo) ||
+          (venta.id.isNotEmpty && v.id == venta.id),
+    );
+
+    if (existingIndex != -1) {
+      // Actualizar si ya existe (puede venir con más datos)
+      profile.ventas[existingIndex] = venta;
+    } else {
+      profile.ventas.add(venta);
+    }
+
+    profiles[profileName] = profile;
+    // _saveProfilesData guarda localmente Y sincroniza a Firestore automáticamente
+    await _saveProfilesData(profiles);
+    notifyListeners(); // Refresca dashboard e historial en la UI
+  }
+
+  /// Establece el modo DEMO localmente (true = demo, false = none).
+  Future<void> setDemoMode(bool enabled) async {
+    if (enabled) {
+      await _saveActivationLocally(ActivationStatus.demo);
+    } else {
+      await _saveActivationLocally(ActivationStatus.none);
+      // No eliminar la clave automáticamente; activar PRO debe hacerse via activateLicense
+    }
+    notifyListeners();
+  }
+
+  /// Cierra sesión: abandona sincronía en tiempo real y borra la licencia local.
+  Future<void> signOutUser() async {
+    try {
+      await _userDataSubscription?.cancel();
+    } catch (_) {}
+    _userDataSubscription = null;
+    _activeRealtimeSyncLicenseKey = null;
+    _currentLicenseKey = null;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_licenseKeyKey);
+    await _saveActivationLocally(ActivationStatus.none);
+
+    // Limpiar TODOS los datos del perfil actual al cerrar sesión
+    try {
+      final profileName = await getCurrentProfileName();
+      final profiles = await _loadProfilesData();
+      if (profiles.containsKey(profileName)) {
+        // Crear perfil vacío (sin clientes, productos ni ventas)
+        profiles[profileName] = Perfil(clients: [], products: [], ventas: []);
+        await _saveProfilesData(profiles);
+      }
+    } catch (e) {
+      // Error al limpiar datos
+    }
+
+    notifyListeners();
+  }
+
   Future<void> addProfile(String profileName) async {
     final status = await getActivationStatus();
     if (status == ActivationStatus.none) {
@@ -716,9 +949,6 @@ class StorageService extends ChangeNotifier {
       throw ('Necesitas activar la aplicación (DEMO o PRO) para exportar datos.');
     }
     // <<< FIX: `print` reemplazado por `kDebugMode` >>>
-    if (kDebugMode) {
-      print("Exportar datos...");
-    }
     final profiles = await _loadProfilesData();
     final currentProfile = await getCurrentProfileName();
     final data = {
@@ -734,9 +964,6 @@ class StorageService extends ChangeNotifier {
       throw ('Necesitas activar la aplicación (DEMO o PRO) para importar datos.');
     }
     // <<< FIX: `print` reemplazado por `kDebugMode` >>>
-    if (kDebugMode) {
-      print("Importar datos...");
-    }
     try {
       final data = jsonDecode(jsonString) as Map<String, dynamic>;
       if (data.containsKey('profiles') && data.containsKey('currentProfile')) {
@@ -757,9 +984,6 @@ class StorageService extends ChangeNotifier {
       }
     } catch (e) {
       // <<< FIX: `print` reemplazado por `kDebugMode` >>>
-      if (kDebugMode) {
-        print("Error detallado al importar: $e");
-      }
       throw ('Error al leer o validar el archivo JSON. Asegúrate de que el formato sea correcto.');
     }
   }
@@ -793,6 +1017,7 @@ class StorageService extends ChangeNotifier {
       actividadEconomica: cliente.actividadEconomica,
       departamento: cliente.departamento,
       municipio: cliente.municipio,
+      distrito: cliente.distrito,
       direccion: cliente.direccion,
       email: cliente.email,
       telefono: cliente.telefono,

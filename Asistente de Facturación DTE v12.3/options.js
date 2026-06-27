@@ -988,7 +988,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (UI.salesReportPeriod) UI.salesReportPeriod.addEventListener('change', loadData);
 
         function saveProduct() {
-            chrome.storage.local.get(null, async () => {
+            chrome.storage.local.get(null, async (d) => {
                 const id = UI.product.id.value;
                 const normalizedProductId = id
                     ? (Number.isFinite(Number(id)) && String(Number(id)) === String(id).trim() ? Number(id) : id)
@@ -996,6 +996,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 const baseProduct = {
                     id: normalizedProductId,
+                    lastModified: Date.now(),
                     codigo: UI.product.inputs.codigo.value.trim(),
                     tipo: UI.product.inputs.tipo.value,
                     unidadMedida: UI.product.inputs.unidad.value,
@@ -1014,6 +1015,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     const products = profile.products || [];
                     const oldP = id ? products.find((p) => String(p.id) === String(id)) : null;
                     const newP = { ...baseProduct };
+
+                    // Preservar deletedAt si existe
+                    if (oldP?.deletedAt) {
+                        newP.deletedAt = oldP.deletedAt;
+                    }
 
                     if (isInventoryAllowed && UI.inventoryToggle.checked) {
                         const inputStock = parseInt(UI.product.inputs.stock.value) || 0;
@@ -1286,15 +1292,21 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         if (UI.client.saveBtn) UI.client.saveBtn.addEventListener('click', () => {
-            chrome.storage.local.get(null, async () => {
+            chrome.storage.local.get(null, async (d) => {
                 const id = UI.client.id.value;
 
                 const normalizedClientId = id
                     ? (Number.isFinite(Number(id)) && String(Number(id)) === String(id).trim() ? Number(id) : id)
                     : Date.now();
 
+                // Buscar el cliente existente para preservar campos no editables en la webapp
+                const existingClient = id ? 
+                    (d.profiles[d.currentProfile]?.clients || []).find(c => String(c.id) === String(id)) : 
+                    null;
+
                 const newC = {
                     id: normalizedClientId,
+                    lastModified: Date.now(),
                     nombreCliente: UI.client.inputs.nombre.value,
                     nit: UI.client.inputs.nit.value,
                     nrc: UI.client.inputs.nrc.value,
@@ -1307,11 +1319,17 @@ document.addEventListener('DOMContentLoaded', () => {
                     direccion: UI.client.inputs.direccion.value,
                     departamento: UI.client.inputs.depto.value,
                     municipio: UI.client.inputs.muni.value,
+                    distrito: existingClient?.distrito || '',
                     email: UI.client.inputs.email.value,
                     telefono: UI.client.inputs.telefono.value,
                     tipoPersona: UI.client.inputs.tipoPersona.value,
                     pais: UI.client.inputs.pais.value,
                 };
+
+                // Preservar deletedAt si existe
+                if (existingClient?.deletedAt) {
+                    newC.deletedAt = existingClient.deletedAt;
+                }
 
                 if (!newC.nombreCliente) return alert("Nombre obligatorio");
 

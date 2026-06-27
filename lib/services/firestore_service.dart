@@ -2,7 +2,6 @@
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/foundation.dart';
 import 'dart:async' show StreamSubscription, unawaited;
 import '../models.dart';
 
@@ -31,16 +30,10 @@ class FirestoreService {
     try {
       await _ensureAnonymousSignIn();
       final snapshot = await _db.collection(_licensesCollection).get();
-      if (kDebugMode) {
-        print(
-          'ℹ️ Licencias encontradas en $_licensesCollection: ${snapshot.docs.length}',
-        );
-      }
       return snapshot.docs
           .map((doc) => LicenseData.fromFirestore(doc))
           .toList();
     } catch (e) {
-      if (kDebugMode) print('❌ Error obteniendo licencias: $e');
       return [];
     }
   }
@@ -66,7 +59,6 @@ class FirestoreService {
       if (snapshot.docs.isEmpty) return null;
       return LicenseData.fromFirestore(snapshot.docs.first);
     } catch (e) {
-      if (kDebugMode) print('❌ Error obteniendo licencia: $e');
       return null;
     }
   }
@@ -137,11 +129,6 @@ class FirestoreService {
           });
         } on FirebaseException catch (e) {
           if (e.code != 'permission-denied') rethrow;
-          if (kDebugMode) {
-            print(
-              '⚠️ Sin permisos para amarrar deviceId. Se permite acceso en modo solo lectura de licencia.',
-            );
-          }
         }
         return {
           'success': true,
@@ -157,11 +144,6 @@ class FirestoreService {
           });
         } on FirebaseException catch (e) {
           if (e.code != 'permission-denied') rethrow;
-          if (kDebugMode) {
-            print(
-              '⚠️ Sin permisos para actualizar lastValidatedAt. Continuando validación local.',
-            );
-          }
         }
         return {
           'success': true,
@@ -175,9 +157,6 @@ class FirestoreService {
         'message': 'Esta licencia ya está activada en otro dispositivo.',
       };
     } catch (e) {
-      if (kDebugMode) {
-        print('❌ Error en validación directa de licencia: $e');
-      }
       return {
         'success': false,
         'message': 'Error validando licencia en Firestore.',
@@ -197,7 +176,6 @@ class FirestoreService {
       if (!doc.exists) return null;
       return doc.data();
     } catch (e) {
-      if (kDebugMode) print('❌ Error obteniendo datos usuario: $e');
       return null;
     }
   }
@@ -217,12 +195,8 @@ class FirestoreService {
         'last_modified': DateTime.now().millisecondsSinceEpoch,
       }, SetOptions(merge: true));
 
-      if (kDebugMode) {
-        print('✅ Datos sincronizados a Firestore para: $licenseKey');
-      }
       return true;
     } catch (e) {
-      if (kDebugMode) print('❌ Error sincronizando a Firestore: $e');
       return false;
     }
   }
@@ -237,15 +211,12 @@ class FirestoreService {
           .get();
 
       if (!doc.exists) {
-        if (kDebugMode) print('ℹ️ No hay datos en Firestore para: $licenseKey');
         return null;
       }
 
       final data = doc.data();
-      if (kDebugMode) print('✅ Datos descargados desde Firestore: $licenseKey');
       return data;
     } catch (e) {
-      if (kDebugMode) print('❌ Error descargando de Firestore: $e');
       return null;
     }
   }
@@ -258,16 +229,11 @@ class FirestoreService {
         .collection(_usuariosDataCollection)
         .doc(licenseKey)
         .snapshots()
-        .listen(
-          (doc) {
-            if (doc.exists) {
-              onDataChanged(doc.data());
-            }
-          },
-          onError: (error) {
-            if (kDebugMode) print('❌ Error en listener: $error');
-          },
-        );
+        .listen((doc) {
+          if (doc.exists) {
+            onDataChanged(doc.data());
+          }
+        }, onError: (error) {});
   }
 
   // --- 8. OBTENER CLIENTES DE UNA LICENCIA (para Admin) ---
@@ -293,7 +259,6 @@ class FirestoreService {
 
       return allClients;
     } catch (e) {
-      if (kDebugMode) print('❌ Error obteniendo clientes: $e');
       return [];
     }
   }
@@ -313,11 +278,6 @@ class FirestoreService {
       final byId = await byIdRef.get();
       if (byId.exists) {
         await byIdRef.update({'estado': estado, 'isActive': isActive});
-        if (kDebugMode) {
-          print(
-            '✅ Licencia actualizada por ID: $licenseKey -> estado: $estado',
-          );
-        }
         return true;
       }
 
@@ -333,12 +293,8 @@ class FirestoreService {
         'estado': estado,
         'isActive': isActive,
       });
-      if (kDebugMode) {
-        print('✅ Licencia actualizada por key: $licenseKey -> estado: $estado');
-      }
       return true;
     } catch (e) {
-      if (kDebugMode) print('❌ Error actualizando licencia: $e');
       return false;
     }
   }
@@ -361,10 +317,8 @@ class FirestoreService {
         'lastValidatedAt': FieldValue.serverTimestamp(),
       });
 
-      if (kDebugMode) print('✅ Nueva licencia agregada: $licenseKey');
       return true;
     } catch (e) {
-      if (kDebugMode) print('❌ Error agregando licencia: $e');
       return false;
     }
   }

@@ -10,7 +10,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:convert';
+import 'package:uuid/uuid.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'firebase_options.dart';
 import 'package:flutter/foundation.dart'; // Para kDebugMode
 import 'package:provider/provider.dart'; // <--- IMPORTANTE: Provider
@@ -18,7 +20,6 @@ import 'package:provider/provider.dart'; // <--- IMPORTANTE: Provider
 // --- Imports ---
 import 'clientes_perfiles_screen.dart';
 import 'productos_screen.dart';
-import 'configuracion_screen.dart';
 import 'menu_flotante_widget.dart';
 import 'models.dart';
 import 'storage_service.dart';
@@ -29,10 +30,17 @@ import 'historial_facturas_screen.dart';
 import 'theme_provider.dart'; // <--- IMPORTANTE: Tu archivo de tema
 import 'core/ui/app_colors.dart';
 import 'services/excel_service.dart';
+import 'profile_avatar_menu.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  // Configurar Firestore para reducir warnings de conectividad
+  FirebaseFirestore.instance.settings = const Settings(
+    persistenceEnabled: true, // Habilita caché offline
+    cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED, // Caché sin límite
+  );
 
   // Envolvemos la app en MultiProvider para manejar múltiples estados
   runApp(
@@ -351,10 +359,13 @@ class MainScreen extends StatefulWidget {
   State<MainScreen> createState() => _MainScreenState();
 }
 
-class _MainScreenState extends State<MainScreen> {
+class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   int _selectedIndex = 0;
-  // Variable para controlar si el menú está abierto
   bool _isMenuOpen = false;
+  bool _keyboardVisible = false;
+
+  // PageController para el cambio lazy de pantallas (fix del lag del teclado)
+  late final PageController _pageController;
 
   WebViewController? _webViewController;
   late List<Widget> _widgetOptions;
@@ -371,9 +382,46 @@ class _MainScreenState extends State<MainScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    FocusManager.instance.addListener(_onFocusChanged);
+    _pageController = PageController(initialPage: 0);
     _storage = Provider.of<StorageService>(context, listen: false);
     _buildScreens();
     _loadInitialStatusAndBuildScreens();
+  }
+
+  @override
+  void dispose() {
+    FocusManager.instance.removeListener(_onFocusChanged);
+    WidgetsBinding.instance.removeObserver(this);
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didChangeMetrics() {
+    super.didChangeMetrics();
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    final bool visible = bottomInset > 0;
+    if (visible != _keyboardVisible) {
+      _keyboardVisible = visible;
+      _logPerformance(
+        'Keyboard',
+        visible
+            ? 'opened bottomInset=${bottomInset.toStringAsFixed(1)}'
+            : 'closed',
+      );
+    }
+  }
+
+  void _onFocusChanged() {
+    final focus = FocusManager.instance.primaryFocus;
+    final focusType = focus?.context?.widget.runtimeType.toString() ?? 'none';
+    _logPerformance('FocusChange', 'primaryFocus=$focusType');
+  }
+
+  void _logPerformance(String event, [String details = '']) {
+    if (!kDebugMode) return;
   }
 
   Future<void> _loadInitialStatusAndBuildScreens() async {
@@ -385,9 +433,6 @@ class _MainScreenState extends State<MainScreen> {
         _buildScreens();
       });
     } catch (e) {
-      if (kDebugMode) {
-        print('Error cargando estado inicial: $e');
-      }
       if (!mounted) return;
       setState(() {
         _activationStatus = ActivationStatus.none;
@@ -398,7 +443,8 @@ class _MainScreenState extends State<MainScreen> {
 
   void _buildScreens() {
     _widgetOptions = <Widget>[
-      HomeScreen(                                          // index 0 - Inicio
+      HomeScreen(
+        // index 0 - Inicio
         key: _homeScreenKey,
         initialStatus: _activationStatus,
         onWebViewRequested: (controller) {
@@ -410,45 +456,45 @@ class _MainScreenState extends State<MainScreen> {
         },
         onStatusChangeNeeded: _reloadActivationStatus,
       ),
-      CorreoScreen(key: _correoScreenKey, currentStatus: _activationStatus), // index 1 - Correo
-      ClientesPerfilesScreen(currentStatus: _activationStatus),              // index 2 - Clientes
-      ProductosScreen(                                     // index 3 - Productos
+      CorreoScreen(
+        key: _correoScreenKey,
+        currentStatus: _activationStatus,
+      ), // index 1 - Correo
+      ClientesPerfilesScreen(
+        currentStatus: _activationStatus,
+      ), // index 2 - Clientes
+      ProductosScreen(
+        // index 3 - Productos
         key: _productosScreenKey,
         currentStatus: _activationStatus,
       ),
-      const HistorialFacturasScreen(),                     // index 4 - Facturas
+      const HistorialFacturasScreen(), // index 4 - Facturas
       const AdminPanelScreen(),
     ];
   }
 
   Future<void> _reloadActivationStatus() async {
-    if (kDebugMode) {
-      print("Recargando estado...");
-    }
     final status = await _storage.getActivationStatus();
     if (!mounted) return;
     if (status != _activationStatus) {
-      if (kDebugMode) {
-        print("¡Estado cambió a $status!");
-      }
       setState(() {
         _activationStatus = status;
         _buildScreens();
       });
-    } else {
-      if (kDebugMode) {
-        print("Estado no cambió.");
-      }
-    }
+    } else {}
   }
 
   void _onItemTapped(int index) {
     if (!mounted) return;
 
+    _logPerformance('PageTap', 'from=$_selectedIndex to=$index');
+
+    // Cerrar teclado al cambiar de pantalla — fix del lag
+    FocusManager.instance.primaryFocus?.unfocus();
+
     if (index == 1 && _selectedIndex != 1) {
       _correoScreenKey.currentState?.loadData();
     }
-    // Productos ahora en índice 3
     if (index == 3 && _selectedIndex != 3) {
       _productosScreenKey.currentState?.loadData(_activationStatus);
     }
@@ -456,6 +502,9 @@ class _MainScreenState extends State<MainScreen> {
     setState(() {
       _selectedIndex = index;
     });
+    // Saltar a la página sin animación para evitar lag visual
+    _pageController.jumpToPage(index);
+    _logPerformance('PageSwitch', 'jumped to page $index');
   }
 
   Future<bool> _onWillPop() async {
@@ -469,9 +518,11 @@ class _MainScreenState extends State<MainScreen> {
       }
     }
     if (_selectedIndex != 0) {
+      FocusManager.instance.primaryFocus?.unfocus();
       setState(() {
         _selectedIndex = 0;
       });
+      _pageController.jumpToPage(0);
       return false;
     }
     return true;
@@ -513,7 +564,15 @@ class _MainScreenState extends State<MainScreen> {
         }
       },
       child: Scaffold(
-        body: IndexedStack(index: _selectedIndex, children: _widgetOptions),
+        // PageView con física bloqueada — solo se navega programáticamente.
+        // Construye páginas bajo demanda para evitar instanciar todas las vistas al mismo tiempo.
+        body: PageView.builder(
+          controller: _pageController,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: _widgetOptions.length,
+          itemBuilder: (context, index) => _widgetOptions[index],
+          allowImplicitScrolling: false,
+        ),
         // Verificamos también que el menú NO esté abierto (!__isMenuOpen)
         floatingActionButton: (_selectedIndex == 0 && !_isMenuOpen)
             ? FloatingActionButton(
@@ -562,78 +621,89 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
   late ActivationStatus _activationStatus;
   final TextEditingController _activationKeyController =
       TextEditingController();
   bool _isActivating = false;
   late final StorageService _storage;
-
   WebViewController? _controller;
   bool _showWebView = false;
   bool _estaCargando = true;
   double _downloadProgress = 0.0;
   bool _isDownloading = false;
+  bool _demoMode = false;
+  Future<bool>? _storagePermissionRequestFuture;
 
   // Cache del Future para evitar relanzarlo en cada rebuild
   Future<Perfil?>? _perfilFuture;
+  Future<List<Producto>>? _productosFuture;
+
+  // Para el menú de perfil
+  String _perfilActivo = '';
+  List<String> _perfiles = [];
 
   DateTime? _lastPdfDownloadTime;
   final Duration _pdfCooldown = const Duration(seconds: 5);
+  final Uuid _uuid = const Uuid();
 
   Future<bool> _requestStoragePermissions() async {
-    if (kDebugMode) {
-      print('Solicitando permisos de almacenamiento...');
+    if (_storagePermissionRequestFuture != null) {
+      return _storagePermissionRequestFuture!;
     }
 
+    _storagePermissionRequestFuture = _requestStoragePermissionsInternal();
+    final result = await _storagePermissionRequestFuture!;
+    _storagePermissionRequestFuture = null;
+    return result;
+  }
+
+  Future<bool> _requestStoragePermissionsInternal() async {
     if (Platform.isAndroid) {
       try {
-        var storageStatus = await Permission.storage.status;
+        final manageStatus = await Permission.manageExternalStorage.status;
+        if (manageStatus.isGranted) {
+          return true;
+        }
+
+        if (manageStatus.isDenied ||
+            manageStatus.isLimited ||
+            manageStatus.isRestricted) {
+          final manageRequest = await Permission.manageExternalStorage
+              .request();
+          if (manageRequest.isGranted) {
+            return true;
+          }
+        }
+
+        final storageStatus = await Permission.storage.status;
         if (storageStatus.isGranted) {
           return true;
         }
-        final storageRequest = await Permission.storage.request();
-        if (storageRequest.isGranted) {
-          return true;
+
+        if (storageStatus.isDenied ||
+            storageStatus.isLimited ||
+            storageStatus.isRestricted) {
+          final storageRequest = await Permission.storage.request();
+          if (storageRequest.isGranted) {
+            return true;
+          }
         }
+
+        return true;
       } catch (e) {
-        if (kDebugMode) {
-          print('Warning: error comprobando Permission.storage: $e');
-        }
+        return true;
       }
-      return false;
     }
+
     var status = await Permission.storage.status;
     if (!status.isGranted) {
       status = await Permission.storage.request();
     }
     return status.isGranted;
-  }
-
-  Future<String> _saveFileToDownloadsPublic(
-    Uint8List data,
-    String filename,
-  ) async {
-    try {
-      const platform = MethodChannel('com.facturacion.sv.app_factura/files');
-
-      final String? savePath = await platform.invokeMethod('saveToDownloads', {
-        'data': data,
-        'filename': filename,
-      });
-
-      if (savePath == null || savePath.isEmpty) {
-        throw Exception(
-          'Error nativo: La ruta de guardado es nula o vacía. ¿Falta implementar Kotlin?',
-        );
-      }
-      return savePath;
-    } catch (e) {
-      if (kDebugMode) {
-        print('Error en _saveFileToDownloadsPublic: $e');
-      }
-      rethrow;
-    }
   }
 
   @override
@@ -642,8 +712,34 @@ class _HomeScreenState extends State<HomeScreen> {
     _activationStatus = widget.initialStatus;
     _storage = Provider.of<StorageService>(context, listen: false);
     _perfilFuture = _storage.getCurrentProfileData();
+    _productosFuture = _storage.getProductos();
+    _demoMode = widget.initialStatus == ActivationStatus.demo;
     _storage.addListener(_onStorageUpdated);
-    _maybeRequestStoragePermission();
+    _loadPerfilInfo();
+    // Solicitar permisos inmediatamente al iniciar la app
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _maybeRequestStoragePermission();
+    });
+  }
+
+  Future<void> _loadPerfilInfo() async {
+    final nombre = await _storage.getCurrentProfileName();
+    final lista = await _storage.getProfileNames();
+    if (mounted) {
+      setState(() {
+        _perfilActivo = nombre;
+        _perfiles = lista;
+      });
+    }
+  }
+
+  void _refreshPerfilFutures() {
+    if (!mounted) return;
+    setState(() {
+      _perfilFuture = _storage.getCurrentProfileData();
+      _productosFuture = _storage.getProductos();
+    });
+    _loadPerfilInfo();
   }
 
   void _onStorageUpdated() {
@@ -652,23 +748,36 @@ class _HomeScreenState extends State<HomeScreen> {
       if (mounted) {
         setState(() {
           _perfilFuture = _storage.getCurrentProfileData();
+          _productosFuture = _storage.getProductos();
         });
+        _loadPerfilInfo();
       }
     });
   }
 
   Future<void> _maybeRequestStoragePermission() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final asked = prefs.getBool('storage_permission_asked') ?? false;
-      if (!asked) {
-        await _requestStoragePermissions();
-        await prefs.setBool('storage_permission_asked', true);
+      if (Platform.isAndroid) {
+        // Verificar primero el estado actual del permiso
+        final manageStatus = await Permission.manageExternalStorage.status;
+        final storageStatus = await Permission.storage.status;
+
+        // Si ya tenemos alguno de los permisos, no hacer nada
+        if (manageStatus.isGranted || storageStatus.isGranted) {
+          return;
+        }
+
+        // Si ningún permiso está otorgado, verificar si ya preguntamos antes
+        final prefs = await SharedPreferences.getInstance();
+        final asked = prefs.getBool('storage_permission_asked') ?? false;
+
+        if (!asked) {
+          await _requestStoragePermissions();
+          await prefs.setBool('storage_permission_asked', true);
+        }
       }
     } catch (e) {
-      if (kDebugMode) {
-        print('Error comprobando SharedPreferences para permisos: $e');
-      }
+      final _ = e;
     }
   }
 
@@ -709,9 +818,7 @@ class _HomeScreenState extends State<HomeScreen> {
         return '$cleanFallback.json';
       }
     } catch (e) {
-      if (kDebugMode) {
-        print('Error al parsear JSON para buscar nombre de archivo: $e');
-      }
+      final _ = e;
     }
     if (fallbackName.endsWith('.json')) {
       return fallbackName;
@@ -719,21 +826,121 @@ class _HomeScreenState extends State<HomeScreen> {
     return '$fallbackName.json';
   }
 
+  /// Escanea el archivo en el MediaStore de Android para que sea visible en Descargas
+  Future<void> _scanFile(String path) async {
+    if (!Platform.isAndroid) return;
+    try {
+      const platform = MethodChannel('com.facturacion.sv.app_factura/files');
+      await platform.invokeMethod('scanFile', {'path': path});
+    } catch (e) {
+      final _ = e;
+    }
+  }
+
+  /// Extrae los datos de factura del JSON descargado y los registra en el historial.
+  Future<void> _registrarVentaDesdeJson(String jsonContent) async {
+    try {
+      final decoded = jsonDecode(jsonContent) as Map<String, dynamic>;
+      await _registrarVentaDesdeMap(decoded);
+    } catch (e) {
+      final _ = e;
+    }
+  }
+
+  // Almacena metadata de la última factura procesada para nombrar archivos
+  String? _lastInvoiceClientName;
+  DateTime? _lastInvoiceDate;
+
+  /// Crea un objeto Venta desde un Map y lo guarda via StorageService.
+  /// Esto sincroniza la factura al historial de la app Y a Firestore (webapp).
+  Future<void> _registrarVentaDesdeMap(Map<String, dynamic> data) async {
+    try {
+      final now = DateTime.now();
+
+      // Extraer campos del DTE — compatible con el formato del MH de El Salvador
+      final identificacion =
+          data['identificacion'] as Map<String, dynamic>? ?? {};
+      final receptor = data['receptor'] as Map<String, dynamic>? ?? {};
+      final resumen = data['resumen'] as Map<String, dynamic>? ?? {};
+      final cuerpo = data['cuerpoDocumento'] as List<dynamic>? ?? [];
+
+      final codigo =
+          identificacion['codigoGeneracion']?.toString() ??
+          data['codigoGeneracion']?.toString() ??
+          data['codigo']?.toString() ??
+          '';
+
+      final numeroControl =
+          identificacion['numeroControl']?.toString() ??
+          data['numeroControl']?.toString() ??
+          '';
+
+      final fecha =
+          identificacion['fecEmi']?.toString() ??
+          data['fecha']?.toString() ??
+          '${now.day}/${now.month}/${now.year}';
+
+      final hora =
+          identificacion['horEmi']?.toString() ??
+          data['hora']?.toString() ??
+          '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}';
+
+      final totalPagar =
+          resumen['totalPagar']?.toString() ??
+          data['totalPagar']?.toString() ??
+          data['total']?.toString() ??
+          '0.00';
+
+      final nombreCliente =
+          receptor['nombre']?.toString() ??
+          data['nombreCliente']?.toString() ??
+          data['cliente']?.toString() ??
+          'Cliente General';
+
+      final tipoDte =
+          identificacion['tipoDte']?.toString() ??
+          data['tipoDte']?.toString() ??
+          data['tipo']?.toString() ??
+          '01';
+
+      final estado = data['estado']?.toString() ?? 'PROCESADO';
+      final sello =
+          data['selloRecibido']?.toString() ?? data['sello']?.toString();
+
+      // Guardar metadata para nombrar archivos
+      _lastInvoiceClientName = nombreCliente;
+      _lastInvoiceDate = now;
+
+      final venta = Venta(
+        id: codigo.isNotEmpty ? codigo : _uuid.v4(),
+        fecha: fecha,
+        hora: hora,
+        timestamp: now.millisecondsSinceEpoch,
+        codigo: codigo.isNotEmpty ? codigo : null,
+        numeroControl: numeroControl.isNotEmpty ? numeroControl : null,
+        sello: sello,
+        total: totalPagar,
+        cliente: nombreCliente,
+        tipo: tipoDte,
+        estado: estado,
+        items: cuerpo,
+      );
+
+      await _storage.addVenta(venta);
+    } catch (e) {
+      final _ = e;
+    }
+  }
+
   Future<void> _setupWebView() async {
     _controller = WebViewController();
     await _controller!.addJavaScriptChannel(
       'FlutterChannel',
       onMessageReceived: (JavaScriptMessage message) async {
-        if (kDebugMode) {
-          print('Mensaje recibido de JS: ${message.message}');
-        }
         try {
           final data = jsonDecode(message.message) as Map<String, dynamic>;
 
           if (data['action'] == 'downloadDTE') {
-            if (kDebugMode) {
-              print('Acción downloadDTE (interceptor JS) recibida.');
-            }
             if (data['processingStarted'] == true) {
               if (mounted) {
                 setState(() {
@@ -753,6 +960,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   fallbackName,
                 );
                 await _handleJsonDataDownload(jsonContent, finalFilename);
+                // Registrar la venta en el historial al mismo tiempo
+                await _registrarVentaDesdeJson(jsonContent);
               }
               if (pdfUrl.isNotEmpty) {
                 await _launchPdfUrl(pdfUrl);
@@ -762,9 +971,6 @@ class _HomeScreenState extends State<HomeScreen> {
               }
             }
           } else if (data['action'] == 'downloadFromBlob') {
-            if (kDebugMode) {
-              print('Acción downloadFromBlob (lector de blob) recibida.');
-            }
             final String jsonContent = data['jsonContent'] ?? '';
             if (jsonContent.isNotEmpty) {
               final String fallbackName =
@@ -773,18 +979,27 @@ class _HomeScreenState extends State<HomeScreen> {
                 jsonContent,
                 fallbackName,
               );
-              _handleJsonDataDownload(jsonContent, finalFilename);
+              await _handleJsonDataDownload(jsonContent, finalFilename);
+              await _registrarVentaDesdeJson(jsonContent);
             } else {
               _showErrorSnackBar('Error: El blob JSON estaba vacío.');
             }
             _showMessage('JSON descargado. Se abrirá una ventana para el PDF.');
+          } else if (data['action'] == 'invoiceGenerated') {
+            // El WebView notifica que se generó una factura (sin descargar aún)
+            // La webapp debe llamar: FlutterChannel.postMessage(JSON.stringify({action:'invoiceGenerated', invoice:{...}}))
+            try {
+              final invoiceMap = data['invoice'] as Map<String, dynamic>?;
+              if (invoiceMap != null) {
+                await _registrarVentaDesdeMap(invoiceMap);
+              }
+            } catch (e) {
+              final _ = e;
+            }
           } else if (data['action'] == 'openWindow') {
             try {
               final String url = (data['url'] ?? '').toString();
               if (url.isEmpty || url == 'about:blank') {
-                if (kDebugMode) {
-                  print('openWindow ignorado para URL vacía/about:blank');
-                }
                 return;
               }
               final uri = Uri.parse(url);
@@ -794,25 +1009,19 @@ class _HomeScreenState extends State<HomeScreen> {
                 _showErrorSnackBar('No se pudo abrir el enlace: $url');
               }
             } catch (e) {
-              if (kDebugMode) {
-                print('Error abriendo ventana desde JS: $e');
-              }
               _showErrorSnackBar('Error al abrir enlace desde la página.');
             }
           } else if (data['action'] == 'pdfBlob') {
             final now = DateTime.now();
             if (_lastPdfDownloadTime != null &&
                 now.difference(_lastPdfDownloadTime!) < _pdfCooldown) {
-              if (kDebugMode) {
-                print('[pdfBlob] Cooldown: Ignorando descarga duplicada.');
-              }
               return;
             }
             _lastPdfDownloadTime = now;
             try {
               final String base64Data = data['base64'] ?? '';
               final String originalFileName =
-                  data['filename']?.replaceAll(
+                  data['filename']?.toString().replaceAll(
                     RegExp(r'[^a-zA-Z0-9_.-]'),
                     '',
                   ) ??
@@ -824,55 +1033,34 @@ class _HomeScreenState extends State<HomeScreen> {
                 _showErrorSnackBar('PDF vacío o no válido.');
                 return;
               }
-
               final bytes = base64Decode(base64Data);
-
-              final String savePath = await _saveFileToDownloadsPublic(
-                bytes,
-                filename,
-              );
-
-              if (kDebugMode) {
-                print('[pdfBlob] PDF guardado en: $savePath');
-              }
               try {
-                const platform = MethodChannel(
-                  'com.facturacion.sv.app_factura/files',
+                await _requestStoragePermissions();
+
+                // Guarda en Descargas/asistente de facturacion DTE/facturas emitidas/<perfil>/<año>/<mes>/
+                final savedFile = await _storage.saveFacturaPdf(
+                  filename,
+                  bytes,
+                  clientName: _lastInvoiceClientName,
+                  fecha: _lastInvoiceDate,
                 );
-                await platform.invokeMethod('scanFile', {'path': savePath});
-              } catch (e) {
-                if (kDebugMode) {
-                  print('Error solicitando scanFile: $e');
-                }
-              }
-              _showMessage('Archivo PDF guardado en Descargas: $filename');
-              try {
-                final res = await OpenFilex.open(savePath);
-                if (kDebugMode) {
-                  print('OpenFilex result (pdfBlob): $res');
-                }
-                if (res.type != ResultType.done) {
-                  throw Exception('No se pudo abrir el PDF');
+                await _scanFile(savedFile.path);
+
+                _showMessage('PDF guardado: ${savedFile.path}');
+
+                try {
+                  await OpenFilex.open(savedFile.path);
+                } catch (e) {
+                  // Ignorar error al abrir el archivo
                 }
               } catch (e) {
-                if (kDebugMode) {
-                  print('Error abriendo PDF con OpenFilex: $e');
-                }
-                _showErrorSnackBar('Error al abrir el PDF: ${e.toString()}');
+                _showErrorSnackBar('Error al guardar PDF: ${e.toString()}');
               }
             } catch (e) {
-              if (kDebugMode) {
-                print('Error procesando pdfBlob desde JS: $e');
-              }
-              _showErrorSnackBar(
-                'Error al procesar PDF recibido: ${e.toString()}',
-              );
+              _showErrorSnackBar('Error al procesar PDF: ${e.toString()}');
             }
           }
         } catch (e) {
-          if (kDebugMode) {
-            print('Error procesando mensaje de JS: $e');
-          }
           _showErrorSnackBar('Error procesando datos de la página.');
         }
       },
@@ -891,16 +1079,10 @@ class _HomeScreenState extends State<HomeScreen> {
             setState(() => _estaCargando = false);
           }
           _controller!.runJavaScript(jsInjector);
-          if (kDebugMode) {
-            print("Interceptor JS y helpers inyectados en $url");
-          }
         },
         onWebResourceError: (WebResourceError error) {
           if (mounted) {
             setState(() => _estaCargando = false);
-          }
-          if (kDebugMode) {
-            print('Error al cargar recurso: ${error.description}');
           }
           _showErrorSnackBar(
             'Error: ${error.description} (Code: ${error.errorCode})',
@@ -908,27 +1090,16 @@ class _HomeScreenState extends State<HomeScreen> {
         },
         onNavigationRequest: (NavigationRequest request) async {
           final String url = request.url;
-          if (kDebugMode) {
-            print('NavReq: $url | Main frame: ${request.isMainFrame}');
-          }
           if (url.endsWith('.pdf') ||
               url.endsWith('.zip') ||
               url.endsWith('.doc') ||
               url.endsWith('.docx') ||
               url.endsWith('.xls') ||
               url.endsWith('.xlsx')) {
-            if (kDebugMode) {
-              print('Detectada descarga de archivo directo (fallback): $url');
-            }
             _handleFileDownload(url);
             return NavigationDecision.prevent;
           }
           if (url.startsWith('blob:') && request.isMainFrame) {
-            if (kDebugMode) {
-              print(
-                'Navegación a JSON/Blob detectada. PREVINIENDO y LEYENDO...',
-              );
-            }
             final String blobReadScript =
                 '''
         (async function() {
@@ -966,21 +1137,12 @@ class _HomeScreenState extends State<HomeScreen> {
           }
           if (url == 'about:blank' || url.startsWith('javascript:')) {
             if (url == 'about:blank' && !request.isMainFrame) {
-              if (kDebugMode) {
-                print('Permitiendo navegación de pop-up a: $url');
-              }
               return NavigationDecision.navigate;
             }
             if (url == 'about:blank' && request.isMainFrame) {
-              if (kDebugMode) {
-                print('Bloqueando navegación de frame principal a: $url');
-              }
               return NavigationDecision.prevent;
             }
             if (url.startsWith('javascript:')) {
-              if (kDebugMode) {
-                print('Permitiendo navegación interna: $url');
-              }
               return NavigationDecision.navigate;
             }
           }
@@ -992,11 +1154,6 @@ class _HomeScreenState extends State<HomeScreen> {
           if (!request.isMainFrame &&
               uri.host.isNotEmpty &&
               uri.host != currentHost) {
-            if (kDebugMode) {
-              print(
-                'Detectado pop-up a host diferente ($url). Abriendo externamente.',
-              );
-            }
             _showMessage('Abriendo enlace externo...');
 
             if (await canLaunchUrl(uri)) {
@@ -1005,11 +1162,6 @@ class _HomeScreenState extends State<HomeScreen> {
               _showErrorSnackBar('No se pudo abrir enlace externo.');
             }
             return NavigationDecision.prevent;
-          }
-          if (kDebugMode) {
-            print(
-              'Navegación normal permitida (isMainFrame: ${request.isMainFrame}, host: ${uri.host}).',
-            );
           }
           return NavigationDecision.navigate;
         },
@@ -1023,9 +1175,6 @@ class _HomeScreenState extends State<HomeScreen> {
         Uri.parse('https://admin.factura.gob.sv/login'),
       );
     } catch (e) {
-      if (kDebugMode) {
-        print("Error cargando URL inicial: $e");
-      }
       _showErrorSnackBar("No se pudo cargar la página inicial.");
       if (mounted) {
         setState(() => _estaCargando = false);
@@ -1046,58 +1195,36 @@ class _HomeScreenState extends State<HomeScreen> {
     String filename,
   ) async {
     try {
+      // Solicita permisos pero no bloquea si fallan (funciona con carpeta app-specific)
       await _requestStoragePermissions();
 
-      if (Platform.isAndroid) {
-        final Uint8List dataBytes = utf8.encode(jsonContent);
-        final String savePath = await _saveFileToDownloadsPublic(
-          dataBytes,
-          filename,
-        );
+      // Primero registrar la venta para obtener el nombre del cliente
+      await _registrarVentaDesdeJson(jsonContent);
 
-        if (kDebugMode) {
-          print('[_handleJsonDataDownload] JSON guardado en: $savePath');
-        }
+      final savedFile = await _storage.saveFacturaJson(filename, jsonContent);
+
+      if (Platform.isAndroid) {
         try {
           const platform = MethodChannel(
             'com.facturacion.sv.app_factura/files',
           );
-          await platform.invokeMethod('scanFile', {'path': savePath});
+          await platform.invokeMethod('scanFile', {'path': savedFile.path});
         } catch (e) {
-          if (kDebugMode) {
-            print('Error solicitando scanFile: $e');
-          }
+          final _ = e;
         }
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('JSON guardado en Descargas: $filename'),
-              duration: const Duration(seconds: 4),
-            ),
-          );
-        }
-      } else {
-        final directory = await getApplicationDocumentsDirectory();
-        final String savePath = '${directory.path}/$filename';
-        final File file = File(savePath);
-        await file.writeAsString(jsonContent, flush: true);
-        if (kDebugMode) {
-          print('[_handleJsonDataDownload] JSON guardado en: $savePath');
-        }
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('JSON guardado: $filename'),
-              duration: const Duration(seconds: 2),
-            ),
-          );
-        }
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('JSON guardado: $filename\n${savedFile.path}'),
+            duration: const Duration(seconds: 5),
+            backgroundColor: Colors.green[700],
+          ),
+        );
       }
     } catch (e) {
-      if (kDebugMode) {
-        print("[_handleJsonDataDownload] *** ERROR AL GUARDAR JSON: $e");
-      }
-      _showErrorSnackBar('Error al guardar archivo JSON: ${e.toString()}');
+      _showErrorSnackBar(' Error al guardar JSON: ${e.toString()}');
     }
   }
 
@@ -1116,6 +1243,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final uri = Uri.parse(cleanUrl);
 
     try {
+      // Intenta solicitar permisos (pero no bloquea si fallan)
       await _requestStoragePermissions();
 
       final String originalFileName = uri.pathSegments.isNotEmpty
@@ -1145,40 +1273,23 @@ class _HomeScreenState extends State<HomeScreen> {
       );
 
       final File tempFile = File(tempPath);
-      final Uint8List fileBytes = await tempFile.readAsBytes();
+      final List<int> fileBytes = await tempFile.readAsBytes();
 
-      final String savePath = await _saveFileToDownloadsPublic(
-        fileBytes,
+      // Guarda en Descargas/asistente de facturacion DTE/facturas emitidas/<perfil>/<año>/<mes>/
+      final savedFile = await _storage.saveFacturaPdf(
         fileName,
+        fileBytes,
+        clientName: _lastInvoiceClientName,
+        fecha: _lastInvoiceDate,
       );
-
+      await _scanFile(savedFile.path);
       await tempFile.delete();
 
-      try {
-        const platform = MethodChannel('com.facturacion.sv.app_factura/files');
-        await platform.invokeMethod('scanFile', {'path': savePath});
-      } catch (e) {
-        if (kDebugMode) {
-          print('Error solicitando scanFile: $e');
-        }
-      }
+      _showMessage('PDF guardado: ${savedFile.path}');
 
-      _showMessage('Archivo PDF guardado en Descargas: $fileName');
-
-      final result = await OpenFilex.open(savePath);
-      if (kDebugMode) {
-        print('OpenFilex result: $result');
-      }
-      if (result.type != ResultType.done) {
-        throw Exception(
-          'OpenFilex no pudo abrir el archivo: ${result.message}',
-        );
-      }
+      await OpenFilex.open(savedFile.path);
     } catch (e) {
-      if (kDebugMode) {
-        print('No fue posible descargar/abrir localmente el PDF: $e');
-      }
-      _showErrorSnackBar('No se pudo abrir el PDF localmente: ${e.toString()}');
+      _showErrorSnackBar(' Error: ${e.toString()}');
       try {
         if (await canLaunchUrl(uri)) {
           await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -1186,9 +1297,6 @@ class _HomeScreenState extends State<HomeScreen> {
           await launchUrl(uri, mode: LaunchMode.inAppWebView);
         }
       } catch (e2) {
-        if (kDebugMode) {
-          print('Error en fallback al abrir PDF: $e2');
-        }
         _showErrorSnackBar('No se pudo abrir el PDF de ninguna forma');
       }
     } finally {
@@ -1255,35 +1363,39 @@ class _HomeScreenState extends State<HomeScreen> {
       );
 
       final File tempFile = File(tempPath);
-      final Uint8List fileBytes = await tempFile.readAsBytes();
+      File savedFile;
 
-      final String savePath = await _saveFileToDownloadsPublic(
-        fileBytes,
-        fileName,
-      );
+      if (url.endsWith('.pdf') || fileName.endsWith('.pdf')) {
+        final bytes = await tempFile.readAsBytes();
+        savedFile = await _storage.saveFacturaPdf(
+          fileName,
+          bytes,
+          clientName: _lastInvoiceClientName,
+          fecha: _lastInvoiceDate,
+        );
+      } else if (url.endsWith('.json') || fileName.endsWith('.json')) {
+        final content = await tempFile.readAsString();
+        // Primero registrar la venta para obtener el nombre del cliente
+        await _registrarVentaDesdeJson(content);
+        // Guardar JSON con nombre original
+        savedFile = await _storage.saveFacturaJson(fileName, content);
+      } else {
+        final bytes = await tempFile.readAsBytes();
+        savedFile = await _storage.saveFacturaPdf(
+          fileName,
+          bytes,
+          clientName: _lastInvoiceClientName,
+          fecha: _lastInvoiceDate,
+        );
+      }
 
       await tempFile.delete();
-
-      try {
-        const platform = MethodChannel('com.facturacion.sv.app_factura/files');
-        await platform.invokeMethod('scanFile', {'path': savePath});
-      } catch (e) {
-        if (kDebugMode) {
-          print('Error solicitando scanFile: $e');
-        }
-      }
+      await _scanFile(savedFile.path);
 
       if (mounted) {
-        if (url.endsWith('.pdf')) {
-          _showMessage('Archivo PDF guardado en Descargas: $fileName');
-        } else {
-          _showMessage('Archivo descargado: $fileName');
-        }
+        _showMessage('Archivo guardado: $fileName');
       }
     } catch (e) {
-      if (kDebugMode) {
-        print('Error en la descarga: $e');
-      }
       _showErrorSnackBar('Error al descargar el archivo: ${e.toString()}');
     } finally {
       if (mounted) {
@@ -1311,6 +1423,19 @@ class _HomeScreenState extends State<HomeScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(message), backgroundColor: Colors.green[700]),
       );
+    }
+  }
+
+  Future<void> _openWhatsAppSupport() async {
+    final uri = Uri.parse('https://wa.me/50377278551');
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        _showError('No se pudo abrir WhatsApp.');
+      }
+    } catch (e) {
+      _showError('No se pudo abrir WhatsApp.');
     }
   }
 
@@ -1380,6 +1505,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // required for AutomaticKeepAliveClientMixin
     final bool overlayEnabled =
         _activationStatus == ActivationStatus.demo ||
         _activationStatus == ActivationStatus.pro;
@@ -1426,23 +1552,44 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.settings),
-                  tooltip: 'Configuración',
-                  onPressed: () async {
-                    if (!mounted) return;
-                    await Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const ConfiguracionScreen(),
-                      ),
-                    );
-                    widget.onStatusChangeNeeded();
-                    final newStatus = await _storage.getActivationStatus();
-                    if (mounted && newStatus != _activationStatus) {
-                      setState(() => _activationStatus = newStatus);
-                    }
-                  },
+                Padding(
+                  padding: const EdgeInsets.only(right: 8.0),
+                  child: ProfileAvatarMenu(
+                    perfilActivo: _perfilActivo,
+                    perfiles: _perfiles,
+                    activationStatus: _activationStatus,
+                    onCambiarPerfil: (p) async {
+                      if (p != null && p != _perfilActivo) {
+                        await _storage.switchProfile(p);
+                        widget.onStatusChangeNeeded();
+                        final newStatus = await _storage.getActivationStatus();
+                        if (mounted) {
+                          setState(() => _activationStatus = newStatus);
+                        }
+                        _refreshPerfilFutures();
+                      }
+                    },
+                    onAfterConfiguracion: () async {
+                      widget.onStatusChangeNeeded();
+                      final newStatus = await _storage.getActivationStatus();
+                      if (mounted && newStatus != _activationStatus) {
+                        setState(() {
+                          _activationStatus = newStatus;
+                        });
+                      }
+                    },
+                    onCerrarSesion: () async {
+                      await _storage.signOutUser();
+                      widget.onStatusChangeNeeded();
+                      final newStatus = await _storage.getActivationStatus();
+                      if (mounted) {
+                        setState(() {
+                          _activationStatus = newStatus;
+                          _demoMode = false;
+                        });
+                      }
+                    },
+                  ),
                 ),
               ],
       ),
@@ -1525,14 +1672,18 @@ class _HomeScreenState extends State<HomeScreen> {
 
   double _getTotalAcumulado(Perfil? perfil) {
     final ventas = perfil?.ventas ?? const [];
-    return ventas.fold<double>(0, (sum, venta) {
+    return ventas.fold<double>(0, (acc, venta) {
       final raw = (venta.total ?? '0').replaceAll(RegExp(r'[^0-9.,-]'), '');
       final normalized = raw.replaceAll(',', '');
-      return sum + (double.tryParse(normalized) ?? 0);
+      return acc + (double.tryParse(normalized) ?? 0);
     });
   }
 
-  void _showDashboardDetails(BuildContext context, Perfil? perfil) {
+  void _showDashboardDetails(
+    BuildContext context,
+    Perfil? perfil,
+    int productos,
+  ) {
     final clientes = perfil?.clients.length ?? 0;
     final facturas = perfil?.ventas.length ?? 0;
     final total = _getTotalAcumulado(perfil);
@@ -1550,47 +1701,60 @@ class _HomeScreenState extends State<HomeScreen> {
         return SafeArea(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(20, 4, 20, 28),
-            child: FutureBuilder<List<Producto>>(
-              future: _storage.getProductos(),
-              builder: (ctx, snap) {
-                final productos = snap.data?.length ?? 0;
-                return Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Resumen del perfil activo',
-                        style: sheetTheme.textTheme.titleLarge),
-                    const SizedBox(height: 6),
-                    Text(
-                      perfil != null ? 'Datos en tiempo real' : 'Sin perfil cargado',
-                      style: sheetTheme.textTheme.bodyMedium,
-                    ),
-                    const SizedBox(height: 20),
-                    _detailStatRow(sheetTheme, Icons.group_outlined, Colors.teal,
-                        'Clientes registrados', clientes.toString()),
-                    const Divider(height: 24),
-                    _detailStatRow(sheetTheme, Icons.receipt_long_outlined,
-                        Colors.indigo, 'Facturas emitidas', facturas.toString()),
-                    const Divider(height: 24),
-                    _detailStatRow(sheetTheme, Icons.payments_outlined, Colors.green,
-                        'Total acumulado', '\$${total.toStringAsFixed(2)}'),
-                    const Divider(height: 24),
-                    _detailStatRow(sheetTheme, Icons.calculate_outlined,
-                        Colors.orange, 'Promedio por factura',
-                        '\$${promedio.toStringAsFixed(2)}'),
-                    const Divider(height: 24),
-                    _detailStatRow(sheetTheme, Icons.inventory_2_outlined,
-                        Colors.deepPurple, 'Productos registrados',
-                        productos.toString()),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Toca una sección para ver más detalles en su pantalla.',
-                      style: sheetTheme.textTheme.bodyMedium,
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                );
-              },
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Resumen del perfil activo',
+                  style: sheetTheme.textTheme.titleLarge,
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  perfil != null
+                      ? 'Datos en tiempo real'
+                      : 'Sin perfil cargado',
+                  style: sheetTheme.textTheme.bodyMedium,
+                ),
+                const SizedBox(height: 20),
+                _detailStatRow(
+                  sheetTheme,
+                  Icons.group_outlined,
+                  Colors.teal,
+                  'Clientes registrados',
+                  clientes.toString(),
+                ),
+                const Divider(height: 24),
+                _detailStatRow(
+                  sheetTheme,
+                  Icons.payments_outlined,
+                  Colors.green,
+                  'Total acumulado',
+                  '\$${total.toStringAsFixed(2)}',
+                ),
+                const Divider(height: 24),
+                _detailStatRow(
+                  sheetTheme,
+                  Icons.calculate_outlined,
+                  Colors.orange,
+                  'Promedio por factura',
+                  '\$${promedio.toStringAsFixed(2)}',
+                ),
+                const Divider(height: 24),
+                _detailStatRow(
+                  sheetTheme,
+                  Icons.inventory_2_outlined,
+                  Colors.deepPurple,
+                  'Productos registrados',
+                  productos.toString(),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Toca una sección para ver más detalles en su pantalla.',
+                  style: sheetTheme.textTheme.bodyMedium,
+                  textAlign: TextAlign.center,
+                ),
+              ],
             ),
           ),
         );
@@ -1598,8 +1762,13 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _detailStatRow(ThemeData theme, IconData icon, Color color,
-      String label, String value) {
+  Widget _detailStatRow(
+    ThemeData theme,
+    IconData icon,
+    Color color,
+    String label,
+    String value,
+  ) {
     return Row(
       children: [
         Container(
@@ -1612,9 +1781,12 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         const SizedBox(width: 16),
         Expanded(
-          child: Text(label,
-              style: theme.textTheme.bodyLarge
-                  ?.copyWith(fontWeight: FontWeight.w500)),
+          child: Text(
+            label,
+            style: theme.textTheme.bodyLarge?.copyWith(
+              fontWeight: FontWeight.w500,
+            ),
+          ),
         ),
         Text(
           value,
@@ -1629,14 +1801,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildDashboardCard(BuildContext context, Perfil? perfil) {
     final clientes = perfil?.clients.length ?? 0;
-    final facturas = perfil?.ventas.length ?? 0;
     final total = _getTotalAcumulado(perfil);
     final theme = Theme.of(context);
 
     Widget metric(String title, String value, IconData icon, Color color) {
       return Expanded(
         child: Container(
-          margin: const EdgeInsets.only(right: 8),
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
           decoration: BoxDecoration(
             color: color.withValues(alpha: 0.10),
@@ -1668,136 +1838,190 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
-    return InkWell(
-      onTap: () => _showDashboardDetails(context, perfil),
-      borderRadius: BorderRadius.circular(16),
-      child: Card(
-        elevation: 0,
-        child: Padding(
-          padding: const EdgeInsets.all(18),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+    return FutureBuilder<List<Producto>>(
+      future: _productosFuture,
+      builder: (ctx, snap) {
+        final productos = snap.data?.length ?? 0;
+        return InkWell(
+          onTap: () => _showDashboardDetails(context, perfil, productos),
+          borderRadius: BorderRadius.circular(16),
+          child: Card(
+            elevation: 0,
+            child: Padding(
+              padding: const EdgeInsets.all(18),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: Text(
-                      'Resumen de facturación',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Resumen de facturación',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
+                      Icon(
+                        Icons.open_in_new_rounded,
+                        size: 16,
+                        color: theme.colorScheme.onSurface.withValues(
+                          alpha: 0.4,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Ver detalle',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurface.withValues(
+                            alpha: 0.4,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  // Total de ingresos - Full Width
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 14,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.green.withValues(alpha: 0.10),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons.payments_outlined,
+                          color: Colors.green,
+                          size: 20,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          '\$${total.toStringAsFixed(2)}',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w800,
+                            color: Colors.green,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Total de ingresos',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurface.withValues(
+                              alpha: 0.6,
+                            ),
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  Icon(
-                    Icons.open_in_new_rounded,
-                    size: 16,
-                    color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    'Ver detalle',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
-              // Fila 1: Clientes y Facturas
-              Row(
-                children: [
-                  metric('Clientes', '$clientes', Icons.group_outlined, Colors.teal),
-                  metric('Facturas', '$facturas', Icons.receipt_long_outlined, Colors.indigo),
-                ],
-              ),
-              const SizedBox(height: 8),
-              // Fila 2: Total y Productos (productos via FutureBuilder anidado)
-              Row(
-                children: [
-                  metric('\$Total', '\$${total.toStringAsFixed(2)}', Icons.payments_outlined, Colors.green),
-                  FutureBuilder<List<Producto>>(
-                    future: _storage.getProductos(),
-                    builder: (ctx, snap) {
-                      final count = snap.data?.length ?? 0;
-                      return metric('Productos', '$count', Icons.inventory_2_outlined, Colors.deepPurple);
-                    },
+                  const SizedBox(height: 12),
+                  // Clientes y Productos - Compartir ancho
+                  Row(
+                    children: [
+                      metric(
+                        'Clientes',
+                        '$clientes',
+                        Icons.group_outlined,
+                        Colors.teal,
+                      ),
+                      const SizedBox(width: 8),
+                      metric(
+                        'Productos',
+                        '$productos',
+                        Icons.inventory_2_outlined,
+                        Colors.deepPurple,
+                      ),
+                    ],
                   ),
                 ],
               ),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
   Widget _buildActivationSection() {
     final theme = Theme.of(context);
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Activación de la aplicación',
-              style: theme.textTheme.titleMedium,
+    return Padding(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Para activar todas las funcionalidades, escríbenos por WhatsApp o usa tu clave de licencia.',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: const Color.fromARGB(255, 59, 59, 59),
+              fontWeight: FontWeight.bold,
             ),
-            const SizedBox(height: 16),
-            Text(
-              'Estado actual: ${_activationStatus.chipLabel}',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                fontSize: 16,
-                color: _activationStatus.color,
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _openWhatsAppSupport,
+                  style: OutlinedButton.styleFrom(
+                    backgroundColor: const Color(0xFF25D366),
+                    foregroundColor: Colors.white,
+                    side: const BorderSide(color: Colors.white, width: 2),
+                  ),
+                  icon: const Icon(Icons.chat_outlined),
+                  label: const Text('WhatsApp +503 7727-8551'),
+                ),
               ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          const SizedBox(height: 16),
+          Text(
+            'Introduce tu clave de licencia:',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: const Color.fromARGB(255, 59, 59, 59),
+              fontWeight: FontWeight.bold,
             ),
-            const SizedBox(height: 16),
-            Text(
-              'Para la activación de todas las funcionalidades por favor contactarnos al: ',
-              style: theme.textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 6),
+          TextField(
+            controller: _activationKeyController,
+            textCapitalization: TextCapitalization.characters,
+            decoration: const InputDecoration(hintText: 'XXXX-XXXX-XXXX-XXXX'),
+          ),
+          const SizedBox(height: 16),
+          ElevatedButton(
+            onPressed: _isActivating ? null : _activateApp,
+            style: ElevatedButton.styleFrom(
+              minimumSize: const Size(double.infinity, 50),
+              backgroundColor: const Color(
+                0xFF0891B2,
+              ), // Celeste oscuro (cyan-600)
+              foregroundColor: Colors.white,
             ),
-            const SizedBox(height: 16),
-            Text(
-              '7727-8551 o 7722-0472',
-              style: theme.textTheme.bodyLarge?.copyWith(
-                color: theme.disabledColor,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Introduce tu clave de licencia:',
-              style: theme.textTheme.bodyMedium,
-            ),
-            const SizedBox(height: 6),
-            TextField(
-              controller: _activationKeyController,
-              textCapitalization: TextCapitalization.characters,
-              decoration: const InputDecoration(
-                hintText: 'XXXX-XXXX-XXXX-XXXX',
-              ),
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _isActivating ? null : _activateApp,
-              style: ElevatedButton.styleFrom(
-                minimumSize: const Size(double.infinity, 45),
-              ),
-              child: _isActivating
-                  ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : const Text('Activar'),
-            ),
-            const SizedBox(height: 16),
-            Text('Clave DEMO: DEMO-2025', style: theme.textTheme.bodyMedium),
-          ],
-        ),
+            child: _isActivating
+                ? const SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Text(
+                    'ACTIVAR',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+          ),
+          const SizedBox(height: 16),
+        ],
       ),
     );
   }
@@ -1825,9 +2049,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     'assets/images/cardPrincipal.png',
                     fit: BoxFit.cover,
                     errorBuilder: (context, error, stackTrace) {
-                      if (kDebugMode) {
-                        print("Error cargando imagen: $error");
-                      }
                       return Container(
                         height: 150,
                         color: Colors.grey[200],
@@ -1879,38 +2100,123 @@ class _HomeScreenState extends State<HomeScreen> {
       future: _perfilFuture,
       builder: (context, snapshot) {
         final perfil = snapshot.data;
-        return ListView(
-          padding: const EdgeInsets.all(16.0),
-          children: [
-            const SizedBox(height: 16.0),
-            _buildGreeting(),
-            const SizedBox(height: 16),
+
+        final List<Widget> children = [
+          const SizedBox(height: 16.0),
+          _buildGreeting(),
+          const SizedBox(height: 16),
+        ];
+
+        if (_activationStatus == ActivationStatus.none) {
+          // Primera vez: 1) modo Demo, 2) modo Premium colapsable, 3) iniciar asistente
+          children.add(_buildModeSelector());
+          children.add(const SizedBox(height: 16));
+          children.add(
             _buildOverlaySection(
               context,
               overlayEnabled ? _toggleWebView : null,
             ),
-            const SizedBox(height: 16),
-            _buildDashboardCard(context, perfil),
-            if (_activationStatus != ActivationStatus.pro) ...[
-              _buildActivationSection(),
-            ],
-            const SizedBox(height: 8),
-            if (_activationStatus != ActivationStatus.pro) _buildProSection(),
-          ],
+          );
+        } else if (_activationStatus == ActivationStatus.pro) {
+          // PRO: 1) iniciar asistente, 2) resumen de facturación
+          children.add(_buildOverlaySection(context, _toggleWebView));
+          children.add(const SizedBox(height: 16));
+          children.add(_buildDashboardCard(context, perfil));
+        } else if (_activationStatus == ActivationStatus.demo) {
+          // DEMO: mantener selector/card premium visible + asistente
+          children.add(_buildModeSelector());
+          children.add(const SizedBox(height: 16));
+          children.add(_buildOverlaySection(context, _toggleWebView));
+        }
+
+        children.add(const SizedBox(height: 8));
+
+        return ListView(
+          padding: const EdgeInsets.all(16.0),
+          children: children,
         );
       },
     );
   }
 
-  Widget _buildProSection() {
-    return Card(
-      child: const Padding(
-        padding: EdgeInsets.all(24.0),
-        child: Text(
-          'Actualiza a la version PRO para acceder a todas las caracteristicas de la app',
-          textAlign: TextAlign.center,
+  Widget _buildModeSelector() {
+    final theme = Theme.of(context);
+    return Column(
+      children: [
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Modo de inicio',
+                            style: theme.textTheme.titleMedium,
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Activa el modo DEMO para probar la app sin clave.',
+                            style: theme.textTheme.bodyMedium,
+                          ),
+                        ],
+                      ),
+                    ),
+                    Switch(
+                      value: _demoMode,
+                      onChanged: (v) async {
+                        setState(() => _demoMode = v);
+                        try {
+                          await _storage.setDemoMode(v);
+                        } catch (e) {
+                          final _ = e;
+                        }
+                        widget.onStatusChangeNeeded();
+                        final newStatus = await _storage.getActivationStatus();
+                        if (mounted) {
+                          setState(() => _activationStatus = newStatus);
+                        }
+                      },
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
         ),
-      ),
+        const SizedBox(height: 16),
+        Container(
+          decoration: BoxDecoration(
+            color: const Color.fromARGB(255, 231, 248, 255),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: const Color.fromARGB(255, 192, 235, 255),
+              width: 3,
+            ),
+          ),
+          child: ExpansionTile(
+            title: Text(
+              'ACTIVA LA VERSION PREMIUM',
+              style: theme.textTheme.titleMedium?.copyWith(
+                color: const Color.fromARGB(255, 27, 27, 27),
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            iconColor: Colors.black,
+            collapsedIconColor: Colors.black,
+            shape: const RoundedRectangleBorder(),
+            collapsedShape: const RoundedRectangleBorder(),
+            childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            children: [_buildActivationSection()],
+          ),
+        ),
+      ],
     );
   }
 }

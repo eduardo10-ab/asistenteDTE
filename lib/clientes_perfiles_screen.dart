@@ -2,11 +2,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'dart:async';
+import 'dart:io';
+import 'dart:convert';
+import 'package:flutter/foundation.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:path_provider/path_provider.dart';
 
 // --- Importaciones ---
 import 'models.dart';
 import 'storage_service.dart';
 import 'cliente_form.dart';
+import 'profile_avatar_menu.dart';
 
 // --- COLORES ESPECÍFICOS ---
 const Color dangerColor = Color(0xFFD9534F);
@@ -22,7 +29,10 @@ class ClientesPerfilesScreen extends StatefulWidget {
   State<ClientesPerfilesScreen> createState() => _ClientesPerfilesScreenState();
 }
 
-class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
+class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
   late final StorageService _storage;
 
   List<String> _perfiles = [];
@@ -32,16 +42,44 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
   Cliente? _clienteParaEditar;
   bool _mostrarFormCliente = false;
   final TextEditingController _searchController = TextEditingController();
+  Timer? _searchDebounceTimer;
+  final ValueNotifier<List<Cliente>> _filteredClientesNotifier =
+      ValueNotifier<List<Cliente>>([]);
 
   @override
   void initState() {
     super.initState();
     _storage = context.read<StorageService>();
     _storage.addListener(_onStorageChanged);
-    _searchController.addListener(() {
-      if (mounted) setState(() {});
-    });
+    _searchController.addListener(_onSearchChanged);
     _loadAllData(widget.currentStatus);
+  }
+
+  void _onSearchChanged() {
+    _searchDebounceTimer?.cancel();
+    _searchDebounceTimer = Timer(
+      const Duration(milliseconds: 220),
+      _applySearchFilter,
+    );
+  }
+
+  void _applySearchFilter() {
+    final query = _searchController.text.trim().toLowerCase();
+    final filtered = query.isEmpty
+        ? List<Cliente>.from(_clientes)
+        : _clientes.where((cliente) {
+            final lowerName = cliente.nombreCliente.toLowerCase();
+            final lowerNit = cliente.nit.toLowerCase();
+            final lowerDui = cliente.dui.toLowerCase();
+            final lowerCommercial = cliente.nombreComercial.toLowerCase();
+            return lowerName.contains(query) ||
+                lowerNit.contains(query) ||
+                lowerDui.contains(query) ||
+                lowerCommercial.contains(query);
+          }).toList();
+
+    filtered.sort((a, b) => b.lastModified.compareTo(a.lastModified));
+    _filteredClientesNotifier.value = filtered;
   }
 
   @override
@@ -55,13 +93,17 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
   @override
   void dispose() {
     _storage.removeListener(_onStorageChanged);
+    _searchDebounceTimer?.cancel();
+    _filteredClientesNotifier.dispose();
     _searchController.dispose();
     super.dispose();
   }
 
   void _onStorageChanged() {
     if (!mounted) return;
-    _loadAllData(widget.currentStatus);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _loadAllData(widget.currentStatus);
+    });
   }
 
   Future<void> _loadAllData(ActivationStatus status) async {
@@ -81,6 +123,7 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
         _mostrarFormCliente = false;
         _clienteParaEditar = null;
       });
+      _applySearchFilter();
     } catch (e) {
       if (!mounted) return;
       _showError(e.toString());
@@ -102,21 +145,6 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message), backgroundColor: successColor),
     );
-  }
-
-  List<Cliente> _getFilteredClientes() {
-    final query = _searchController.text.trim().toLowerCase();
-    final filtered = query.isEmpty
-        ? List<Cliente>.from(_clientes)
-        : _clientes.where((cliente) {
-            return cliente.nombreCliente.toLowerCase().contains(query) ||
-                cliente.nit.toLowerCase().contains(query) ||
-                cliente.dui.toLowerCase().contains(query) ||
-                cliente.nombreComercial.toLowerCase().contains(query);
-          }).toList();
-
-    filtered.sort((a, b) => b.lastModified.compareTo(a.lastModified));
-    return filtered;
   }
 
   String _formatDateGroup(int timestamp) {
@@ -143,7 +171,10 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
               child: ListTile(
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 4,
+                ),
                 title: Text(
                   cliente.nombreCliente,
                   maxLines: 1,
@@ -153,7 +184,9 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
                 subtitle: Text(
                   cliente.nit.isNotEmpty
                       ? cliente.nit
-                      : (cliente.dui.isNotEmpty ? cliente.dui : 'Sin documento'),
+                      : (cliente.dui.isNotEmpty
+                            ? cliente.dui
+                            : 'Sin documento'),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: theme.textTheme.bodyMedium,
@@ -189,8 +222,11 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
     );
   }
 
-  List<Widget> _buildClientGroups(ThemeData theme, bool allowWriteActions) {
-    final filtered = _getFilteredClientes();
+  List<Widget> _buildClientGroups(
+    ThemeData theme,
+    bool allowWriteActions,
+    List<Cliente> filtered,
+  ) {
     if (filtered.isEmpty) {
       return [
         Center(
@@ -227,16 +263,23 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
           color: theme.cardTheme.color,
           elevation: 0,
           margin: EdgeInsets.zero,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: filtered.asMap().entries.map((entry) {
-              final i = entry.key;
-              final cliente = entry.value;
+          child: ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: filtered.length,
+            separatorBuilder: (context, index) => Divider(
+              height: 1,
+              thickness: 1,
+              color: theme.colorScheme.outlineVariant.withValues(alpha: 0.4),
+              indent: 16,
+              endIndent: 16,
+            ),
+            itemBuilder: (context, i) {
+              final cliente = filtered[i];
               return _buildClientCard(
                 cliente,
                 theme,
                 allowWriteActions,
-                showDivider: i < filtered.length - 1,
                 onTap: allowWriteActions
                     ? () {
                         setState(() {
@@ -246,13 +289,14 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
                       }
                     : null,
               );
-            }).toList(),
+            },
           ),
         ),
       ];
     }
 
     return entries.map((entry) {
+      final items = entry.value;
       return Card(
         color: theme.cardTheme.color,
         elevation: 0,
@@ -269,39 +313,50 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
               fontWeight: FontWeight.w600,
             ),
           ),
-          subtitle: Text('${entry.value.length} cliente(s)'),
-          children: entry.value.asMap().entries.map((e) {
-            final i = e.key;
-            final cliente = e.value;
-            final isLast = i == entry.value.length - 1;
-            return Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _buildClientCard(
-                  cliente,
-                  theme,
-                  allowWriteActions,
-                  compact: true,
-                  onTap: allowWriteActions
-                      ? () {
-                          setState(() {
-                            _clienteParaEditar = cliente;
-                            _mostrarFormCliente = true;
-                          });
-                        }
-                      : null,
-                ),
-                if (!isLast)
-                  Divider(
-                    height: 1,
-                    thickness: 1,
-                    color: theme.colorScheme.outlineVariant.withValues(alpha: 0.4),
-                    indent: 16,
-                    endIndent: 16,
+          subtitle: Text('${items.length} cliente(s)'),
+          // Usamos un SizedBox con ListView.builder para render lazy
+          children: [
+            ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: items.length > 10
+                    ? MediaQuery.of(context).size.height * 0.45
+                    : double.infinity,
+              ),
+              child: ListView.separated(
+                shrinkWrap: items.length <= 10,
+                physics: items.length > 10
+                    ? const ClampingScrollPhysics()
+                    : const NeverScrollableScrollPhysics(),
+                itemCount: items.length,
+                separatorBuilder: (context, index) => Divider(
+                  height: 1,
+                  thickness: 1,
+                  color: theme.colorScheme.outlineVariant.withValues(
+                    alpha: 0.4,
                   ),
-              ],
-            );
-          }).toList(),
+                  indent: 16,
+                  endIndent: 16,
+                ),
+                itemBuilder: (context, i) {
+                  final cliente = items[i];
+                  return _buildClientCard(
+                    cliente,
+                    theme,
+                    allowWriteActions,
+                    compact: true,
+                    onTap: allowWriteActions
+                        ? () {
+                            setState(() {
+                              _clienteParaEditar = cliente;
+                              _mostrarFormCliente = true;
+                            });
+                          }
+                        : null,
+                  );
+                },
+              ),
+            ),
+          ],
         ),
       );
     }).toList();
@@ -437,27 +492,84 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
   void _onExport() async {
     try {
       final json = await _storage.exportData();
-      await Clipboard.setData(ClipboardData(text: json));
-      _showMessage('Datos copiados al portapapeles.');
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final filename = 'backup_facturacion_$timestamp.json';
+
+      final Uint8List dataBytes = utf8.encode(json);
+      await _saveFileToDownloadsPublic(dataBytes, filename);
+      _showMessage('Backup guardado: $filename');
     } catch (e) {
       _showError('Error al exportar: ${e.toString()}');
     }
   }
 
   void _onImport() async {
-    if (!mounted) return;
-    final jsonToImport = await _showInputDialog(
-      'Importar Copia',
-      'Pega el contenido JSON aquí:',
-      maxLines: 5,
-    );
-    if (jsonToImport == null || jsonToImport.isEmpty) return;
     try {
-      await _storage.importData(jsonToImport);
-      _showMessage('Datos importados. Recargando...');
+      // Usar file_picker para seleccionar el archivo JSON
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['json'],
+        allowMultiple: false,
+        lockParentWindow: true,
+      );
+
+      if (result == null || result.files.isEmpty) {
+        return;
+      }
+
+      final pickedFile = result.files.first;
+
+      String jsonContent;
+
+      if (pickedFile.bytes != null) {
+        // Web/iOS: bytes disponibles directamente
+        jsonContent = String.fromCharCodes(pickedFile.bytes!);
+      } else if (pickedFile.path != null) {
+        // Android/Desktop: leer desde path
+        final file = File(pickedFile.path!);
+        if (!await file.exists()) {
+          _showError('El archivo no existe en la ruta: ${pickedFile.path}');
+          return;
+        }
+        jsonContent = await file.readAsString();
+      } else {
+        _showError('No se pudo leer el archivo seleccionado.');
+        return;
+      }
+
+      await _storage.importData(jsonContent);
+      _showMessage('Datos importados correctamente');
       _loadAllData(widget.currentStatus);
     } catch (e) {
       _showError('Error al importar: ${e.toString()}');
+    }
+  }
+
+  Future<String> _saveFileToDownloadsPublic(
+    Uint8List dataBytes,
+    String filename,
+  ) async {
+    try {
+      if (Platform.isAndroid) {
+        const platform = MethodChannel('com.facturacion.sv.app_factura/files');
+        final String? savePath = await platform.invokeMethod<String>(
+          'saveToDownloads',
+          {'data': dataBytes, 'filename': filename},
+        );
+
+        if (savePath == null || savePath.isEmpty) {
+          throw Exception('No se obtuvo la ruta del archivo guardado.');
+        }
+
+        return savePath;
+      }
+
+      final dir = await getApplicationDocumentsDirectory();
+      final file = File('${dir.path}/$filename');
+      await file.writeAsBytes(dataBytes, flush: true);
+      return file.path;
+    } catch (e) {
+      rethrow;
     }
   }
 
@@ -471,7 +583,6 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
     return showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        // Aseguramos que el diálogo use el color de tarjeta del tema
         backgroundColor: Theme.of(context).cardTheme.color,
         title: Text(title),
         content: TextField(
@@ -479,6 +590,7 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
           decoration: InputDecoration(labelText: label),
           maxLines: maxLines,
           autofocus: true,
+          textInputAction: TextInputAction.done,
         ),
         actions: [
           TextButton(
@@ -496,6 +608,7 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // required for AutomaticKeepAliveClientMixin
     final theme = Theme.of(context);
 
     // Estilo dinámico para los botones Outlined
@@ -514,7 +627,29 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: AppBar(title: const Text('Clientes y Perfiles')),
+      appBar: AppBar(
+        title: const Text('Clientes y Perfiles'),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 8.0),
+            child: ProfileAvatarMenu(
+              perfilActivo: _perfilActivo ?? '',
+              perfiles: _perfiles,
+              activationStatus: widget.currentStatus,
+              onCrearPerfil: _onAddProfile,
+              onCambiarPerfil: _onSwitchProfile,
+              onAfterConfiguracion: () => _loadAllData(widget.currentStatus),
+              onCerrarSesion: () async {
+                await Provider.of<StorageService>(
+                  context,
+                  listen: false,
+                ).signOutUser();
+                _loadAllData(widget.currentStatus);
+              },
+            ),
+          ),
+        ],
+      ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
@@ -523,7 +658,6 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
                 builder: (context, constraints) {
                   final wide = constraints.maxWidth >= 900;
                   final profileCard = Card(
-                    
                     elevation: 0,
                     child: ExpansionTile(
                       initiallyExpanded: false,
@@ -560,21 +694,101 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
                               ),
                             ),
                           ),
-                        DropdownButtonFormField<String>(
-                          initialValue: _perfilActivo,
-                          items: _perfiles
-                              .map(
-                                (p) =>
-                                    DropdownMenuItem(value: p, child: Text(p)),
-                              )
-                              .toList(),
-                          onChanged: _onSwitchProfile,
-                          style: theme.textTheme.bodyLarge?.copyWith(
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          dropdownColor: theme.cardTheme.color,
-                          decoration: const InputDecoration(),
-                          isExpanded: true,
+                        Autocomplete<String>(
+                          initialValue: TextEditingValue(text: _perfilActivo ?? ''),
+                          optionsBuilder: (TextEditingValue textEditingValue) {
+                            if (textEditingValue.text.isEmpty) {
+                              return _perfiles;
+                            }
+                            final searchText = textEditingValue.text.toLowerCase();
+                            return _perfiles.where((p) => p.toLowerCase().contains(searchText));
+                          },
+                          onSelected: (String selection) {
+                            _onSwitchProfile(selection);
+                          },
+                          fieldViewBuilder: (
+                            BuildContext context,
+                            TextEditingController fieldController,
+                            FocusNode focusNode,
+                            VoidCallback onFieldSubmitted,
+                          ) {
+                            if (fieldController.text.isEmpty && _perfilActivo != null && _perfilActivo!.isNotEmpty) {
+                              fieldController.text = _perfilActivo!;
+                            }
+
+                            return TextFormField(
+                              controller: fieldController,
+                              focusNode: focusNode,
+                              readOnly: true,
+                              decoration: InputDecoration(
+                                suffixIcon: const Icon(Icons.arrow_drop_down, size: 20),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8.0),
+                                ),
+                              ),
+                              style: theme.textTheme.bodyLarge?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            );
+                          },
+                          optionsViewBuilder: (
+                            BuildContext context,
+                            AutocompleteOnSelected<String> onSelected,
+                            Iterable<String> options,
+                          ) {
+                            final optionsList = options.toList();
+                            final itemHeight = 48.0;
+                            final totalHeight = (optionsList.length * itemHeight).clamp(150.0, 400.0);
+                            
+                            return Align(
+                              alignment: Alignment.topLeft,
+                              child: Material(
+                                elevation: 4.0,
+                                borderRadius: BorderRadius.circular(8.0),
+                                color: theme.cardColor,
+                                child: ConstrainedBox(
+                                  constraints: BoxConstraints(
+                                    minHeight: 150,
+                                    maxHeight: totalHeight,
+                                    maxWidth: MediaQuery.of(context).size.width * 0.9,
+                                  ),
+                                  child: ListView.builder(
+                                    padding: const EdgeInsets.symmetric(vertical: 8.0),
+                                    shrinkWrap: true,
+                                    itemCount: optionsList.length,
+                                    itemBuilder: (BuildContext context, int index) {
+                                      final String option = optionsList[index];
+                                      return InkWell(
+                                        onTap: () {
+                                          onSelected(option);
+                                        },
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 16.0,
+                                            vertical: 12.0,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            border: Border(
+                                              bottom: BorderSide(
+                                                color: theme.dividerColor,
+                                                width: 0.5,
+                                              ),
+                                            ),
+                                          ),
+                                          child: Text(
+                                            option,
+                                            style: theme.textTheme.bodyMedium?.copyWith(
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
                         ),
                         const SizedBox(height: 16),
                         Row(
@@ -700,18 +914,30 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
                         style: theme.textTheme.titleLarge,
                       ),
                       const SizedBox(height: 16),
-                      TextField(
-                        controller: _searchController,
-                        decoration: InputDecoration(
-                          labelText: 'Buscar cliente',
-                          prefixIcon: const Icon(Icons.search),
-                          suffixIcon: _searchController.text.isNotEmpty
-                              ? IconButton(
-                                  onPressed: () => _searchController.clear(),
-                                  icon: const Icon(Icons.clear),
-                                )
-                              : null,
-                        ),
+                      ValueListenableBuilder<TextEditingValue>(
+                        valueListenable: _searchController,
+                        builder: (context, value, _) {
+                          return TextField(
+                            controller: _searchController,
+                            textInputAction: TextInputAction.done,
+                            keyboardType: TextInputType.text,
+                            enableInteractiveSelection: true,
+                            onEditingComplete: () {
+                              FocusScope.of(context).unfocus();
+                            },
+                            decoration: InputDecoration(
+                              labelText: 'Buscar cliente',
+                              prefixIcon: const Icon(Icons.search),
+                              suffixIcon: value.text.isNotEmpty
+                                  ? IconButton(
+                                      onPressed: () =>
+                                          _searchController.clear(),
+                                      icon: const Icon(Icons.clear),
+                                    )
+                                  : null,
+                            ),
+                          );
+                        },
                       ),
                       const SizedBox(height: 12),
                       SizedBox(
@@ -757,7 +983,19 @@ class _ClientesPerfilesScreenState extends State<ClientesPerfilesScreen> {
                             : const SizedBox.shrink(),
                       ),
                       const SizedBox(height: 16),
-                      ..._buildClientGroups(theme, allowWriteActions),
+                      ValueListenableBuilder<List<Cliente>>(
+                        valueListenable: _filteredClientesNotifier,
+                        builder: (context, filteredClientes, _) {
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: _buildClientGroups(
+                              theme,
+                              allowWriteActions,
+                              filteredClientes,
+                            ),
+                          );
+                        },
+                      ),
                     ],
                   );
 

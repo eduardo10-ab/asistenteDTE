@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
-import 'package:open_filex/open_filex.dart';
+
 import 'package:provider/provider.dart';
 import 'models.dart';
 import 'storage_service.dart';
-import 'services/excel_service.dart';
 import 'core/ui/app_colors.dart';
 
 class HistorialFacturasScreen extends StatefulWidget {
@@ -80,48 +78,13 @@ class _HistorialFacturasScreenState extends State<HistorialFacturasScreen> {
         return timestampB.compareTo(timestampA);
       });
     } catch (e) {
-      if (kDebugMode) print('Error cargando facturas: $e');
+      final _ = e;
     }
 
     if (mounted) {
       setState(() {
         isLoading = false;
       });
-    }
-  }
-
-  Future<void> _generarReporte() async {
-    try {
-      final excelService = context.read<ExcelService>();
-      final perfil =
-          await storageService.getCurrentProfileDataFromFirestore() ??
-          await storageService.getCurrentProfileData();
-      final nombrePerfil = await storageService.getCurrentProfileName();
-
-      final file = await excelService.generarReporteVentasExcel(
-        nombrePerfil: nombrePerfil,
-        ventas: perfil.ventas,
-      );
-
-      await OpenFilex.open(file.path);
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✅ Reporte de ventas generado y abierto'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
     }
   }
 
@@ -141,9 +104,12 @@ class _HistorialFacturasScreenState extends State<HistorialFacturasScreen> {
       },
       decoration: InputDecoration(
         hintText: 'Buscar cliente o código...',
-        prefixIcon: const Icon(Icons.search, color: colorTextoSecundario),
+        prefixIcon: Icon(
+          Icons.search,
+          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
+        ),
         filled: true,
-        fillColor: colorBlanco,
+        fillColor: Theme.of(context).inputDecorationTheme.fillColor,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide.none,
@@ -151,56 +117,6 @@ class _HistorialFacturasScreenState extends State<HistorialFacturasScreen> {
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 16,
           vertical: 14,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFilterField() {
-    return DropdownButtonFormField<String>(
-      initialValue: filtroEstado,
-      isExpanded: true,
-      decoration: InputDecoration(
-        filled: true,
-        fillColor: colorBlanco,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide.none,
-        ),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 14,
-        ),
-      ),
-      items: const [
-        'Todo el Historial',
-        'PROCESADO',
-        'NO PROCESADO',
-        'ANULADO',
-      ].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
-      onChanged: (value) {
-        if (value != null) {
-          filtroEstado = value;
-          _cargarFacturas();
-        }
-      },
-    );
-  }
-
-  Widget _buildReportButton({required bool fullWidth}) {
-    return SizedBox(
-      width: fullWidth ? double.infinity : 220,
-      child: ElevatedButton.icon(
-        onPressed: _generarReporte,
-        icon: const Icon(Icons.download),
-        label: const Text('Reporte de Ventas'),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: colorAzulActivo,
-          foregroundColor: colorBlanco,
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
         ),
       ),
     );
@@ -228,33 +144,7 @@ class _HistorialFacturasScreenState extends State<HistorialFacturasScreen> {
             child: Card(
               child: Padding(
                 padding: const EdgeInsets.all(14),
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final isCompact = constraints.maxWidth < 720;
-
-                    if (isCompact) {
-                      return Column(
-                        children: [
-                          _buildSearchField(),
-                          const SizedBox(height: 12),
-                          _buildFilterField(),
-                          const SizedBox(height: 12),
-                          _buildReportButton(fullWidth: true),
-                        ],
-                      );
-                    }
-
-                    return Row(
-                      children: [
-                        Expanded(flex: 3, child: _buildSearchField()),
-                        const SizedBox(width: 12),
-                        Expanded(flex: 2, child: _buildFilterField()),
-                        const SizedBox(width: 12),
-                        _buildReportButton(fullWidth: false),
-                      ],
-                    );
-                  },
-                ),
+                child: _buildSearchField(),
               ),
             ),
           ),
@@ -548,11 +438,15 @@ class _FacturaCard extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
       child: Card(
-        color: colorGrisClaro,
+        color: Theme.of(context).cardTheme.color,
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: Colors.grey.shade200),
+          side: BorderSide(
+            color: Theme.of(
+              context,
+            ).colorScheme.outlineVariant.withValues(alpha: 0.3),
+          ),
         ),
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -637,17 +531,19 @@ class _MiniInfo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: colorBlanco,
+        color: theme.brightness == Brightness.dark
+            ? theme.colorScheme.surface.withValues(alpha: 0.8)
+            : theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(
+          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.3),
+        ),
       ),
-      child: Text(
-        '$label: $value',
-        style: Theme.of(context).textTheme.bodySmall,
-      ),
+      child: Text('$label: $value', style: theme.textTheme.bodySmall),
     );
   }
 }

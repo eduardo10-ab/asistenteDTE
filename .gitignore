@@ -126,6 +126,7 @@ web/build/
 *.orig
 *.class
 *.swp
+nul
 
 # ==============================
 # macOS system files

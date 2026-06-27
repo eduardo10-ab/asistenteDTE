@@ -18,7 +18,7 @@ enum ActivationStatus {
   String get chipLabel {
     switch (this) {
       case ActivationStatus.pro:
-        return 'PRO';
+        return 'PREMIUM';
       case ActivationStatus.demo:
         return 'DEMO';
       case ActivationStatus.none:
@@ -134,6 +134,7 @@ class Cliente {
   String actividadEconomica;
   String departamento;
   String municipio;
+  String distrito;
   int lastModified; // timestamp de última modificación
   String direccion;
   String email;
@@ -156,6 +157,7 @@ class Cliente {
     this.actividadEconomica = '',
     this.departamento = '',
     this.municipio = '',
+    this.distrito = '',
     this.direccion = '',
     this.email = '',
     this.telefono = '',
@@ -185,6 +187,7 @@ class Cliente {
       actividadEconomica: json['actividadEconomica'] ?? '',
       departamento: json['departamento'] ?? '',
       municipio: json['municipio'] ?? '',
+      distrito: json['distrito'] ?? '',
       direccion: json['direccion'] ?? '',
       email: json['email'] ?? '',
       telefono: json['telefono'] ?? '',
@@ -213,6 +216,7 @@ class Cliente {
       'actividadEconomica': actividadEconomica,
       'departamento': departamento,
       'municipio': municipio,
+      'distrito': distrito,
       'direccion': direccion,
       'email': email,
       'telefono': telefono,

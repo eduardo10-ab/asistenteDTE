@@ -35,7 +35,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
       _loadAllLicenses();
     } else {
       setState(() {
-        _errorMessage = '❌ Clave admin incorrecta';
+        _errorMessage = 'Clave admin incorrecta';
         _isAuthenticated = false;
       });
     }
@@ -52,7 +52,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
       });
     } catch (e) {
       setState(() {
-        _errorMessage = '❌ Error cargando licencias: $e';
+        _errorMessage = 'Error cargando licencias: $e';
         _isLoading = false;
       });
     }
@@ -64,10 +64,18 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Desactivar Licencia'),
-        content: Text('¿Estás seguro de que deseas desactivar la licencia:\n$licenseKey?'),
+        content: Text(
+          '¿Estás seguro de que deseas desactivar la licencia:\n$licenseKey?',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
-          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Desactivar')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Desactivar'),
+          ),
         ],
       ),
     );
@@ -80,7 +88,9 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
       if (!mounted) return;
       if (success) {
         _loadAllLicenses();
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Licencia desactivada')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Licencia desactivada')));
       }
     }
   }
@@ -94,7 +104,9 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
     if (!mounted) return;
     if (success) {
       _loadAllLicenses();
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Licencia reactivada')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Licencia reactivada')));
     }
   }
 
@@ -123,7 +135,12 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                   },
                 ),
         ),
-        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cerrar'))],
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cerrar'),
+          ),
+        ],
       ),
     );
   }
@@ -138,9 +155,15 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
           children: [
             const Icon(Icons.lock_outline, size: 64, color: colorCelestePastel),
             const SizedBox(height: 24),
-            const Text('Panel Administrativo', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+            const Text(
+              'Panel Administrativo',
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 8),
-            const Text('Ingresa tu clave de administrador', style: TextStyle(color: colorTextoSecundario)),
+            const Text(
+              'Ingresa tu clave de administrador',
+              style: TextStyle(color: colorTextoSecundario),
+            ),
             const SizedBox(height: 32),
             TextField(
               controller: _adminKeyController,
@@ -148,7 +171,9 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
               decoration: InputDecoration(
                 hintText: 'Clave Admin',
                 prefixIcon: const Icon(Icons.key),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
                 errorText: _errorMessage,
               ),
             ),
@@ -161,7 +186,13 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                   backgroundColor: colorCelestePastel,
                   padding: const EdgeInsets.symmetric(vertical: 12),
                 ),
-                child: const Text('Acceder', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                child: const Text(
+                  'Acceder',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
             ),
           ],
@@ -197,74 +228,97 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _licenses.isEmpty
-              ? const Center(child: Text('No hay licencias registradas'))
-              : ListView.builder(
-                  padding: const EdgeInsets.all(12),
-                  itemCount: _licenses.length,
-                  itemBuilder: (context, index) {
-                    final license = _licenses[index];
-                    return Card(
-                      margin: const EdgeInsets.symmetric(vertical: 8),
-                      child: ExpansionTile(
-                        leading: license.isActive
-                            ? const Icon(Icons.check_circle, color: Colors.green)
-                            : const Icon(Icons.cancel, color: Colors.red),
-                        title: Text(
-                          license.key,
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                        ),
-                        subtitle: Text('${license.businessName} (${license.tier})'),
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+          ? const Center(child: Text('No hay licencias registradas'))
+          : ListView.builder(
+              padding: const EdgeInsets.all(12),
+              itemCount: _licenses.length,
+              itemBuilder: (context, index) {
+                final license = _licenses[index];
+                return Card(
+                  margin: const EdgeInsets.symmetric(vertical: 8),
+                  child: ExpansionTile(
+                    leading: license.isActive
+                        ? const Icon(Icons.check_circle, color: Colors.green)
+                        : const Icon(Icons.cancel, color: Colors.red),
+                    title: Text(
+                      license.key,
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                    subtitle: Text('${license.businessName} (${license.tier})'),
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildInfoRow('Tipo:', license.tier),
+                            _buildInfoRow('Empresa:', license.businessName),
+                            _buildInfoRow(
+                              'Estado:',
+                              license.isActive ? 'Activa' : 'Inactiva',
+                            ),
+                            _buildInfoRow(
+                              'Dispositivo:',
+                              license.deviceId ?? 'Sin vincular',
+                            ),
+                            _buildInfoRow(
+                              'Creada:',
+                              license.createdAt?.toLocal().toString().split(
+                                    '.',
+                                  )[0] ??
+                                  '-',
+                            ),
+                            _buildInfoRow(
+                              'Validada:',
+                              license.lastValidatedAt
+                                      ?.toLocal()
+                                      .toString()
+                                      .split('.')[0] ??
+                                  '-',
+                            ),
+                            const SizedBox(height: 16),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                               children: [
-                                _buildInfoRow('Tipo:', license.tier),
-                                _buildInfoRow('Empresa:', license.businessName),
-                                _buildInfoRow('Estado:', license.isActive ? '✅ Activa' : '❌ Inactiva'),
-                                _buildInfoRow('Dispositivo:', license.deviceId ?? 'Sin vincular'),
-                                _buildInfoRow(
-                                  'Creada:',
-                                  license.createdAt?.toLocal().toString().split('.')[0] ?? '-',
+                                ElevatedButton.icon(
+                                  onPressed: () =>
+                                      _viewClientsForLicense(license.key),
+                                  icon: const Icon(Icons.people),
+                                  label: const Text('Ver Clientes'),
                                 ),
-                                _buildInfoRow(
-                                  'Validada:',
-                                  license.lastValidatedAt?.toLocal().toString().split('.')[0] ?? '-',
-                                ),
-                                const SizedBox(height: 16),
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                                  children: [
-                                    ElevatedButton.icon(
-                                      onPressed: () => _viewClientsForLicense(license.key),
-                                      icon: const Icon(Icons.people),
-                                      label: const Text('Ver Clientes'),
+                                if (license.isActive)
+                                  ElevatedButton.icon(
+                                    onPressed: () =>
+                                        _deactivateLicense(license.key),
+                                    icon: const Icon(Icons.block),
+                                    label: const Text('Desactivar'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.red,
                                     ),
-                                    if (license.isActive)
-                                      ElevatedButton.icon(
-                                        onPressed: () => _deactivateLicense(license.key),
-                                        icon: const Icon(Icons.block),
-                                        label: const Text('Desactivar'),
-                                        style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                                      )
-                                    else
-                                      ElevatedButton.icon(
-                                        onPressed: () => _reactivateLicense(license.key),
-                                        icon: const Icon(Icons.check_circle),
-                                        label: const Text('Activar'),
-                                        style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-                                      ),
-                                  ],
-                                ),
+                                  )
+                                else
+                                  ElevatedButton.icon(
+                                    onPressed: () =>
+                                        _reactivateLicense(license.key),
+                                    icon: const Icon(Icons.check_circle),
+                                    label: const Text('Activar'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.green,
+                                    ),
+                                  ),
                               ],
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    );
-                  },
-                ),
+                    ],
+                  ),
+                );
+              },
+            ),
     );
   }
 
@@ -274,9 +328,20 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         children: [
-          Text(label, style: const TextStyle(fontWeight: FontWeight.bold, color: colorTextoSecundario)),
+          Text(
+            label,
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              color: colorTextoSecundario,
+            ),
+          ),
           const SizedBox(width: 8),
-          Expanded(child: Text(value, style: const TextStyle(color: colorTextoPrincipal))),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(color: colorTextoPrincipal),
+            ),
+          ),
         ],
       ),
     );
@@ -284,6 +349,8 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return _isAuthenticated ? _buildAdminScreen() : _buildAuthenticationScreen();
+    return _isAuthenticated
+        ? _buildAdminScreen()
+        : _buildAuthenticationScreen();
   }
 }
